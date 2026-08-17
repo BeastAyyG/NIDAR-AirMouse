@@ -1,0 +1,16 @@
+name: Validate AirMouse maze
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate-maze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate SDF geometry and nominal route
+        run: python tools/validate_maze.py

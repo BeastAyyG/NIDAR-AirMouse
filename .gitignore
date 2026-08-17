@@ -1,0 +1,30 @@
+# ROS 2 / colcon outputs
+build/
+install/
+log/
+**/build/
+**/install/
+**/log/
+**/__pycache__/
+*.pyc
+
+# Runtime logs and recordings
+*.bag
+*.db3
+*.ulg
+*.tlog
+*.mcap
+*.roslog
+airmouse_*.log
+
+# Local/editor/OS files
+.vscode/
+.idea/
+*.user
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Local environment overrides
+.env
+.env.*
