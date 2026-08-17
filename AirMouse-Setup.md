@@ -28,15 +28,26 @@ powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Headless
 ```
 
 The launcher derives its checkout path from the script location, so it does
-not depend on the original author's Windows username. If PX4 or the model
-repository is in a different WSL location, set these variables first:
+not depend on the original author's Windows username. The GitHub checkout
+contains the model repository, so Linux users do not need a second
+`PX4-gazebo-models` clone. If PX4, the ROS workspace, or the model repository
+is in a different WSL location, set the relevant variables first:
 
 ```powershell
 $env:AIR_MOUSE_PX4_ROOT = "/home/<your-linux-user>/PX4-Autopilot"
-$env:AIR_MOUSE_PX4_MODELS = "/home/<your-linux-user>/PX4-gazebo-models"
 $env:AIR_MOUSE_XRCE_AGENT = "/home/<your-linux-user>/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent"
 powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1
 ```
+
+From Linux, after sourcing ROS 2, run the same shell launcher directly:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+bash ./run_airmouse_sim.sh
+```
+
+`AIR_MOUSE_PX4_MODELS` is optional and is only used as a fallback if the
+bundled `PX4-gazebo-models/worlds/maze.sdf` is not present.
 
 The AirMouse mission is a real PX4 offboard simulation, not only a state
 publisher. It waits for valid PX4 preflight checks, arms, climbs to 2.5 m,

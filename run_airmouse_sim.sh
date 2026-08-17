@@ -3,17 +3,29 @@ set -e
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${AIR_MOUSE_REPO_ROOT:-$SCRIPT_DIR}"
-ROS_WS="${AIR_MOUSE_ROS_WS:-/home/${USER}/ros2_px4_ws}"
-PX4_ROOT="${AIR_MOUSE_PX4_ROOT:-/home/${USER}/PX4-Autopilot}"
-PX4_MODELS="${AIR_MOUSE_PX4_MODELS:-/home/${USER}/PX4-gazebo-models}"
-XRCE_AGENT="${AIR_MOUSE_XRCE_AGENT:-/home/${USER}/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent}"
+LINUX_USER="${USER:-$(id -un)}"
+ROS_WS="${AIR_MOUSE_ROS_WS:-/home/${LINUX_USER}/ros2_px4_ws}"
+PX4_ROOT="${AIR_MOUSE_PX4_ROOT:-/home/${LINUX_USER}/PX4-Autopilot}"
+PX4_MODELS="${AIR_MOUSE_PX4_MODELS:-/home/${LINUX_USER}/PX4-gazebo-models}"
+XRCE_AGENT="${AIR_MOUSE_XRCE_AGENT:-/home/${LINUX_USER}/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent}"
+
+PROJECT_MODELS="$REPO_ROOT/PX4-gazebo-models"
+if [ -f "$PROJECT_MODELS/worlds/maze.sdf" ]; then
+  MAZE_WORLD="$PROJECT_MODELS/worlds/maze.sdf"
+elif [ -f "$PX4_MODELS/worlds/maze.sdf" ]; then
+  MAZE_WORLD="$PX4_MODELS/worlds/maze.sdf"
+else
+  echo "Could not find maze.sdf in the project or optional external model checkout." >&2
+  echo "Expected: $PROJECT_MODELS/worlds/maze.sdf" >&2
+  echo "Or set AIR_MOUSE_PX4_MODELS to an external PX4-gazebo-models path." >&2
+  exit 1
+fi
 
 for required_path in \
   "$REPO_ROOT/nidar_airmouse_ros" \
-  "$REPO_ROOT/PX4-gazebo-models/worlds/maze.sdf" \
   "$REPO_ROOT/airmouse_gui_topdown.config" \
   "$PX4_ROOT" \
-  "$PX4_MODELS"; do
+  "$PX4_ROOT/Tools/simulation/gz/worlds"; do
   if [ ! -e "$required_path" ]; then
     echo "Missing required path: $required_path" >&2
     echo "Set AIR_MOUSE_REPO_ROOT or AIR_MOUSE_PX4_ROOT/AIR_MOUSE_PX4_MODELS if your checkout differs." >&2
@@ -22,9 +34,8 @@ for required_path in \
 done
 
 mkdir -p "$ROS_WS/src/nidar_airmouse_sim"
-mkdir -p "$PX4_MODELS/worlds"
 cp -a "$REPO_ROOT/nidar_airmouse_ros/." "$ROS_WS/src/nidar_airmouse_sim/"
-cp "$REPO_ROOT/PX4-gazebo-models/worlds/maze.sdf" "$PX4_MODELS/worlds/maze.sdf"
+cp "$MAZE_WORLD" "$PX4_ROOT/Tools/simulation/gz/worlds/maze.sdf"
 
 source /opt/ros/jazzy/setup.bash
 source "$ROS_WS/install/setup.bash" 2>/dev/null || true

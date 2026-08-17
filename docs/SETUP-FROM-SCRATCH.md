@@ -34,12 +34,13 @@ The expected WSL locations are:
 
 ```text
 $HOME/PX4-Autopilot
-$HOME/PX4-gazebo-models
 $HOME/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent
 ```
 
-If you use different locations, set the `AIR_MOUSE_PX4_ROOT`,
-`AIR_MOUSE_PX4_MODELS`, and `AIR_MOUSE_XRCE_AGENT` variables described in
+The repository contains its own `PX4-gazebo-models` directory, including the
+maze. A separate `$HOME/PX4-gazebo-models` clone is optional. If you use
+different locations, set the `AIR_MOUSE_PX4_ROOT`, `AIR_MOUSE_ROS_WS`,
+`AIR_MOUSE_PX4_MODELS` (optional fallback), and `AIR_MOUSE_XRCE_AGENT` variables described in
 [`AirMouse-Setup.md`](../AirMouse-Setup.md).
 
 ## 3. Assemble the project checkout
@@ -51,6 +52,13 @@ repository root so `Run-AirMouseSim.ps1`, `nidar_airmouse_ros`,
 ```bash
 git clone <your-airmouse-repository-url> AirMouse
 cd AirMouse
+```
+
+From Linux, source ROS 2 and launch directly from the repository root:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+bash ./run_airmouse_sim.sh
 ```
 
 If `PX4-gazebo-models` is kept as a submodule instead of copied into the

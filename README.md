@@ -16,6 +16,13 @@ From PowerShell at the repository's parent directory:
 powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1
 ```
 
+From Linux, after installing the prerequisites:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+bash ./run_airmouse_sim.sh
+```
+
 Use `-Headless` for CI or machines without a usable Gazebo GUI. The detailed
 setup is in [`AirMouse-Setup.md`](AirMouse-Setup.md).
 
@@ -73,10 +80,11 @@ PYTHONPATH=nidar_airmouse_ros python3 -m pytest nidar_airmouse_ros/tests -q
 
 The verified development target is Windows + WSL2 Ubuntu 24.04, ROS 2 Jazzy,
 Gazebo Harmonic, PX4 v1.17.x, and optional QGroundControl on Windows. The
-launcher expects PX4 at `$HOME/PX4-Autopilot`, the model fork at
-`$HOME/PX4-gazebo-models`, and Micro XRCE-DDS Agent at
-`$HOME/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent`. Override these with
-`AIR_MOUSE_PX4_ROOT`, `AIR_MOUSE_PX4_MODELS`, and `AIR_MOUSE_XRCE_AGENT`.
+launcher expects PX4 at `$HOME/PX4-Autopilot` and Micro XRCE-DDS Agent at
+`$HOME/px4_ros_uxrce_dds_ws/install/bin/MicroXRCEAgent`. The model repository
+is bundled in this checkout. Override locations with
+`AIR_MOUSE_PX4_ROOT`, `AIR_MOUSE_ROS_WS`, `AIR_MOUSE_PX4_MODELS` (optional
+fallback), and `AIR_MOUSE_XRCE_AGENT`.
 
 ## Real-world status
 
