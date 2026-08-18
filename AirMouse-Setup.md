@@ -21,10 +21,20 @@ It synchronizes the local ROS package and maze, builds the package, starts the
 Micro XRCE-DDS agent, starts PX4 SITL with `gz_x500_lidar_2d` inside the
 `maze` world, starts the Gazebo-to-ROS bridge for `/scan` and `/odom`, starts
 the AirMouse ROS nodes, and opens QGroundControl if it is installed. Gazebo
-opens in a visible top-down maze view by default. Use this for a headless run:
+opens in a visible top-down maze view by default. The default `fast` profile
+uses 360 LiDAR samples at 10 Hz and disables maze shadows in the runtime copy;
+the repository source files remain unchanged. Use `-Profile full` to restore
+1080 LiDAR samples at 30 Hz and shadows. Use this for a headless run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Headless
+```
+
+To select a profile explicitly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile fast
+powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile full
 ```
 
 The launcher derives its checkout path from the script location, so it does

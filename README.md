@@ -23,6 +23,10 @@ source /opt/ros/jazzy/setup.bash
 bash ./run_airmouse_sim.sh
 ```
 
+The launcher defaults to the `fast` development profile: 360 LiDAR samples at
+10 Hz and shadows disabled in the copied runtime world. This keeps the same
+real Gazebo/PX4 maze while making WSL2 development responsive. Use
+`-Profile full` for the original 1080-sample, 30 Hz LiDAR and shadow settings.
 Use `-Headless` for CI or machines without a usable Gazebo GUI. The detailed
 setup is in [`AirMouse-Setup.md`](AirMouse-Setup.md).
 
