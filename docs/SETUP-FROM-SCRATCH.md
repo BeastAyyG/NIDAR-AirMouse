@@ -103,3 +103,24 @@ powershell -ExecutionPolicy Bypass -File .\AirMouse\Run-AirMouseSim.ps1 -Headles
 The expected simulation terminal evidence is `LAND/COMPLETE`, `armed:false`,
 and the configured two-marker synthetic validation. It is not physical-flight
 approval; use [`Safety-and-Test-Plan.md`](Safety-and-Test-Plan.md) for that.
+
+### Fast versus accurate mode
+
+Use fast mode for day-to-day WSL2 development. It runs the same maze and PX4
+vehicle with a reduced 2D LiDAR configuration and shadows disabled:
+
+```bash
+AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+```
+
+Use accurate mode for sensor/rendering validation. It keeps the source LiDAR
+settings (1080 samples at 30 Hz) and maze shadows enabled:
+
+```bash
+AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+```
+
+`accurate` and `full` are equivalent names. Add `AIR_MOUSE_GUI=0` for a
+headless Linux or CI run. With the GUI enabled, the launcher requires the
+Camera Tracking service, repairs a stale GUI instance if needed, resumes the
+Gazebo world clock, and follows `x500_lidar_2d_0` with a wide room view.

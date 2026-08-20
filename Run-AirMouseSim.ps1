@@ -1,7 +1,7 @@
 param(
     [string]$Distro = $(if ($env:AIR_MOUSE_WSL_DISTRO) { $env:AIR_MOUSE_WSL_DISTRO } else { "Ubuntu-24.04" }),
     [switch]$Headless,
-    [ValidateSet("fast", "full")]
+    [ValidateSet("fast", "full", "accurate")]
     [string]$Profile = $(if ($env:AIR_MOUSE_PROFILE) { $env:AIR_MOUSE_PROFILE } else { "fast" })
 )
 
@@ -38,4 +38,4 @@ if (Test-Path -LiteralPath $qgroundControl) {
 }
 
 Write-Host "Verify with: wsl.exe -d $Distro -- bash -lc 'source /opt/ros/jazzy/setup.bash; source `$HOME/ros2_px4_ws/install/setup.bash; ros2 topic list'"
-Write-Host "Performance profile: $Profile (use -Profile full for full-fidelity LiDAR and shadows)."
+Write-Host "Performance profile: $Profile (use -Profile accurate or full for full-fidelity LiDAR and shadows)."

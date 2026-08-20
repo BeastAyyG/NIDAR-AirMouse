@@ -26,9 +26,23 @@ bash ./run_airmouse_sim.sh
 The launcher defaults to the `fast` development profile: 360 LiDAR samples at
 10 Hz and shadows disabled in the copied runtime world. This keeps the same
 real Gazebo/PX4 maze while making WSL2 development responsive. Use
-`-Profile full` for the original 1080-sample, 30 Hz LiDAR and shadow settings.
+`-Profile accurate` (or `-Profile full`) for the original 1080-sample, 30 Hz
+LiDAR and shadow settings.
+The launcher also resumes `/world/maze/control` before starting the mission, so a
+previous Gazebo pause cannot leave PX4 waiting for sensor data.
+When the GUI is enabled, it loads the Camera Tracking plugin and follows
+`x500_lidar_2d_0` with a wide room view. If a stale Gazebo GUI was opened
+without that plugin, the launcher replaces it automatically.
 Use `-Headless` for CI or machines without a usable Gazebo GUI. The detailed
 setup is in [`AirMouse-Setup.md`](AirMouse-Setup.md).
+
+From Linux, select the profiles with the environment variable:
+
+```bash
+AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+AIR_MOUSE_GUI=0 AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh  # headless
+```
 
 For a clean machine, follow [`docs/SETUP-FROM-SCRATCH.md`](docs/SETUP-FROM-SCRATCH.md)
 first. The one-line PowerShell command is the project launcher after the

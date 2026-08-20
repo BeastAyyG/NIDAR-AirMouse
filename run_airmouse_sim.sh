@@ -12,8 +12,9 @@ PROFILE="${AIR_MOUSE_PROFILE:-fast}"
 
 case "$PROFILE" in
   fast|full) ;;
+  accurate) PROFILE="full" ;;
   *)
-    echo "Unsupported AIR_MOUSE_PROFILE='$PROFILE'. Use fast or full." >&2
+    echo "Unsupported AIR_MOUSE_PROFILE='$PROFILE'. Use fast or accurate (full)." >&2
     exit 1
     ;;
 esac
@@ -98,13 +99,61 @@ fi
 
 if [ "${AIR_MOUSE_GUI:-1}" = "1" ]; then
   gui_config="$REPO_ROOT/airmouse_gui_topdown.config"
-  if ! pgrep -f '[g]z sim -g --gui-config' >/dev/null; then
+  gui_follow_available=0
+  if pgrep -f '[g]z sim -g --gui-config' >/dev/null && \
+     gz service -i -s /gui/follow >/dev/null 2>&1; then
+    gui_follow_available=1
+  fi
+  if [ "$gui_follow_available" -ne 1 ]; then
+    # Recover a stale GUI instance which opened without the CameraTracking plugin.
+    pkill -f '[g]z sim -g --gui-config' 2>/dev/null || true
     nohup bash -lc "export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; unset GZ_CONFIG_PATH; gz sim -g --gui-config '${gui_config}'" >/tmp/airmouse_gz_gui.log 2>&1 &
+  fi
+
+  # Keep the GUI camera locked to the simulated drone for every launcher run.
+  # The service appears only after the Gazebo GUI connects to the running world.
+  camera_follow_ok=0
+  for attempt in $(seq 1 20); do
+    if gz service -s /gui/follow \
+        --reqtype gz.msgs.StringMsg \
+        --reptype gz.msgs.Boolean \
+        --timeout 1000 \
+        --req 'data: "x500_lidar_2d_0"' >/tmp/airmouse_gz_follow.log 2>&1; then
+      camera_follow_ok=1
+      gz service -s /gui/follow/offset \
+        --reqtype gz.msgs.Vector3d \
+        --reptype gz.msgs.Boolean \
+        --timeout 1000 \
+        --req 'x: -3, z: 8' >/tmp/airmouse_gz_follow_offset.log 2>&1 || true
+      break
+    fi
+    sleep 1
+  done
+  if [ "$camera_follow_ok" -ne 1 ]; then
+    echo "Warning: could not enable Gazebo camera follow; check /tmp/airmouse_gz_follow.log" >&2
   fi
 fi
 
 if ! pgrep -f '[r]os_gz_bridge parameter_bridge' >/dev/null; then
   nohup bash -lc 'source /opt/ros/jazzy/setup.bash; export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; ros2 run ros_gz_bridge parameter_bridge "/world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan" "/model/x500_lidar_2d_0/odometry_with_covariance@nav_msgs/msg/Odometry[gz.msgs.OdometryWithCovariance" --ros-args -r /world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan:=/scan -r /model/x500_lidar_2d_0/odometry_with_covariance:=/odom' >/tmp/airmouse_bridge.log 2>&1 &
+fi
+
+# A GUI pause can freeze the Gazebo clock while PX4 and ROS still appear alive.
+# Explicitly resume the world before starting the mission controller.
+gz_unpause_ok=0
+for attempt in $(seq 1 20); do
+  if gz service -s /world/maze/control \
+      --reqtype gz.msgs.WorldControl \
+      --reptype gz.msgs.Boolean \
+      --timeout 1000 \
+      --req 'pause: false' >/tmp/airmouse_gz_unpause.log 2>&1; then
+    gz_unpause_ok=1
+    break
+  fi
+  sleep 1
+done
+if [ "$gz_unpause_ok" -ne 1 ]; then
+  echo "Warning: could not unpause Gazebo world /world/maze/control; check /tmp/airmouse_gz_unpause.log" >&2
 fi
 
 if ! pgrep -f '/nidar_airmouse_sim/lib/nidar_airmouse_sim/[m]ission-manager' >/dev/null || \

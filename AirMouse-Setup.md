@@ -21,10 +21,12 @@ It synchronizes the local ROS package and maze, builds the package, starts the
 Micro XRCE-DDS agent, starts PX4 SITL with `gz_x500_lidar_2d` inside the
 `maze` world, starts the Gazebo-to-ROS bridge for `/scan` and `/odom`, starts
 the AirMouse ROS nodes, and opens QGroundControl if it is installed. Gazebo
-opens in a visible top-down maze view by default. The default `fast` profile
-uses 360 LiDAR samples at 10 Hz and disables maze shadows in the runtime copy;
-the repository source files remain unchanged. Use `-Profile full` to restore
-1080 LiDAR samples at 30 Hz and shadows. Use this for a headless run:
+opens in a visible top-down maze view by default and follows the drone with
+Camera Tracking when the GUI is enabled. The default `fast` profile uses 360
+LiDAR samples at 10 Hz and disables maze shadows in the runtime copy; the
+repository source files remain unchanged. Use `-Profile accurate` (or
+`-Profile full`) to restore 1080 LiDAR samples at 30 Hz and shadows. Use this
+for a headless run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Headless
@@ -34,7 +36,8 @@ To select a profile explicitly:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile fast
-powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile full
+powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile accurate
+powershell -ExecutionPolicy Bypass -File .\work\Run-AirMouseSim.ps1 -Profile full  # alias
 ```
 
 The launcher derives its checkout path from the script location, so it does
@@ -55,6 +58,19 @@ From Linux, after sourcing ROS 2, run the same shell launcher directly:
 source /opt/ros/jazzy/setup.bash
 bash ./run_airmouse_sim.sh
 ```
+
+Linux profile selection:
+
+```bash
+AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+AIR_MOUSE_GUI=0 AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh  # headless
+```
+
+The launcher copies only the selected fast-profile runtime changes into
+`/tmp/airmouse_fast_models` and the PX4 runtime world. It does not modify the
+committed model source. Accurate mode uses the source sensor and shadow
+settings directly.
 
 `AIR_MOUSE_PX4_MODELS` is optional and is only used as a fallback if the
 bundled `PX4-gazebo-models/worlds/maze.sdf` is not present.
