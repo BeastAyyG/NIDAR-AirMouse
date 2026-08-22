@@ -83,7 +83,7 @@ fi
 
 if ! pgrep -f '[M]icroXRCEAgent udp4 -p 8888' >/dev/null; then
   XRCE_LIB_DIR="$(dirname "$(dirname "$XRCE_AGENT")")/lib"
-  nohup env LD_LIBRARY_PATH="$XRCE_LIB_DIR:/opt/ros/jazzy/lib" "$XRCE_AGENT" udp4 -p 8888 >/tmp/airmouse_xrce.log 2>&1 &
+  setsid nohup env LD_LIBRARY_PATH="$XRCE_LIB_DIR:/opt/ros/jazzy/lib" "$XRCE_AGENT" udp4 -p 8888 </dev/null >/tmp/airmouse_xrce.log 2>&1 &
 fi
 
 if ! pgrep -f '[g]z_x500_lidar_2d' >/dev/null; then
@@ -91,9 +91,9 @@ if ! pgrep -f '[g]z_x500_lidar_2d' >/dev/null; then
   px4_launch_cmd="cd '$PX4_ROOT'; source /opt/ros/jazzy/setup.bash; export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; unset GZ_CONFIG_PATH; ${px4_gz_start}"
   if [ "$PROFILE" = "fast" ]; then
     px4_resource_path="$FAST_MODEL_ROOT${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
-    nohup env "GZ_SIM_RESOURCE_PATH=$px4_resource_path" bash -lc "$px4_launch_cmd" >/tmp/airmouse_px4.log 2>&1 &
+    setsid nohup env "GZ_SIM_RESOURCE_PATH=$px4_resource_path" bash -lc "$px4_launch_cmd" </dev/null >/tmp/airmouse_px4.log 2>&1 &
   else
-    nohup bash -lc "$px4_launch_cmd" >/tmp/airmouse_px4.log 2>&1 &
+    setsid nohup bash -lc "$px4_launch_cmd" </dev/null >/tmp/airmouse_px4.log 2>&1 &
   fi
 fi
 
@@ -107,7 +107,7 @@ if [ "${AIR_MOUSE_GUI:-1}" = "1" ]; then
   if [ "$gui_follow_available" -ne 1 ]; then
     # Recover a stale GUI instance which opened without the CameraTracking plugin.
     pkill -f '[g]z sim -g --gui-config' 2>/dev/null || true
-    nohup bash -lc "export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; unset GZ_CONFIG_PATH; gz sim -g --gui-config '${gui_config}'" >/tmp/airmouse_gz_gui.log 2>&1 &
+    setsid nohup bash -lc "export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; unset GZ_CONFIG_PATH; gz sim -g --gui-config '${gui_config}'" </dev/null >/tmp/airmouse_gz_gui.log 2>&1 &
   fi
 
   # Keep the GUI camera locked to the simulated drone for every launcher run.
@@ -135,7 +135,7 @@ if [ "${AIR_MOUSE_GUI:-1}" = "1" ]; then
 fi
 
 if ! pgrep -f '[r]os_gz_bridge parameter_bridge' >/dev/null; then
-  nohup bash -lc 'source /opt/ros/jazzy/setup.bash; export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; ros2 run ros_gz_bridge parameter_bridge "/world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan" "/model/x500_lidar_2d_0/odometry_with_covariance@nav_msgs/msg/Odometry[gz.msgs.OdometryWithCovariance" --ros-args -r /world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan:=/scan -r /model/x500_lidar_2d_0/odometry_with_covariance:=/odom' >/tmp/airmouse_bridge.log 2>&1 &
+  setsid nohup bash -lc 'source /opt/ros/jazzy/setup.bash; export PATH=/usr/bin:/opt/ros/jazzy/bin:/usr/local/bin; ros2 run ros_gz_bridge parameter_bridge "/world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan" "/model/x500_lidar_2d_0/odometry_with_covariance@nav_msgs/msg/Odometry[gz.msgs.OdometryWithCovariance" --ros-args -r /world/maze/model/x500_lidar_2d_0/link/link/sensor/lidar_2d_v2/scan:=/scan -r /model/x500_lidar_2d_0/odometry_with_covariance:=/odom' </dev/null >/tmp/airmouse_bridge.log 2>&1 &
 fi
 
 # A GUI pause can freeze the Gazebo clock while PX4 and ROS still appear alive.
@@ -158,7 +158,7 @@ fi
 
 if ! pgrep -f '/nidar_airmouse_sim/lib/nidar_airmouse_sim/[m]ission-manager' >/dev/null || \
    ! pgrep -f '/nidar_airmouse_sim/lib/nidar_airmouse_sim/[s]im-survivor-detector' >/dev/null; then
-  nohup bash -lc "source /opt/ros/jazzy/setup.bash; source '$ROS_WS/install/setup.bash'; exec ros2 launch nidar_airmouse_sim airmouse_sim.launch.py auto_start:=true" >/tmp/airmouse_ros.log 2>&1 &
+  setsid nohup bash -lc "source /opt/ros/jazzy/setup.bash; source '$ROS_WS/install/setup.bash'; exec ros2 launch nidar_airmouse_sim airmouse_sim.launch.py auto_start:=true" </dev/null >/tmp/airmouse_ros.log 2>&1 &
 fi
 
 echo "AirMouse simulation services requested (profile=$PROFILE)"
