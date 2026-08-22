@@ -70,7 +70,38 @@ PYTHONPATH=nidar_airmouse_ros python3 -m pytest nidar_airmouse_ros/tests -q
 | ROS 2 | Jazzy package with mission, synthetic detector, localizer, and GCS status nodes |
 | Sensors | Simulated 2D LiDAR bridged to `/scan`; odometry bridged to `/odom` |
 | Mission | Takeoff, fixed safe route, simulated two-marker validation, RTL/land/disarm |
+| Runtime safety guard | LiDAR health/clearance gate, hold on close obstacle, RTL after persistent unsafe data |
 | Real autonomy | Not complete: no hardware driver/calibration, real detector, SLAM, or frontier planner |
+
+## How the constraints are applied
+
+The simulation now has a runtime LiDAR safety contract in addition to the
+offline maze validator and PX4 geofence. The `lidar-safety` node subscribes to
+`/scan` and publishes `/airmouse/safety/status`,
+`/airmouse/safety/lidar_ready`, and `/airmouse/safety/lidar_safe`.
+
+The configured stop distance is never allowed to be smaller than:
+
+```text
+vehicle envelope radius
++ LiDAR/localization uncertainty margin
++ minimum clearance
+```
+
+The mission manager refuses to arm until the LiDAR stream is healthy and clear.
+If a scan becomes invalid, stale, or too close to an obstacle during the
+mission, it holds the current position. If the unsafe state persists, it
+requests PX4 return-to-launch. The current guard uses the closest valid beam as
+a conservative all-around check; it does not yet replace the fixed waypoint
+route with SLAM or a frontier planner.
+
+Useful checks during a run:
+
+```bash
+ros2 topic echo /airmouse/safety/status
+ros2 topic echo /airmouse/mission_status
+ros2 topic hz /scan
+```
 
 ## Repository layout
 

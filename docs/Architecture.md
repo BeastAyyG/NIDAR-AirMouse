@@ -11,10 +11,13 @@ flowchart LR
     DET[sim-survivor-detector\nsynthetic targets]
     LOC[survivor-localizer\nmap point to grid tag]
     BRIDGE[ros_gz_bridge\n/scan + /odom]
+    SAFE[LiDAR safety guard\nhealth + clearance]
     QGC[QGroundControl\noperator view]
 
     GZ -->|physics, LiDAR, odometry| BRIDGE
     BRIDGE -->|/scan, /odom| ROS
+    BRIDGE -->|/scan| SAFE
+    SAFE -->|safe/hold/abort state| ROS
     GZ <-->|PX4 Gazebo bridge| PX4
     PX4 <-->|DDS topics| AGENT
     AGENT <-->|/fmu/in + /fmu/out| ROS
@@ -47,6 +50,9 @@ camera model.
 | `/airmouse/start` | `std_srvs/srv/Trigger` | Start the mission |
 | `/airmouse/abort` | `std_srvs/srv/Trigger` | Request RTL/abort |
 | `/airmouse/complete` | `std_srvs/srv/Trigger` | Controlled completion request |
+| `/airmouse/safety/status` | `std_msgs/msg/String` | JSON LiDAR health, clearance, and failure reason |
+| `/airmouse/safety/lidar_ready` | `std_msgs/msg/Bool` | Valid, non-stale LiDAR stream gate |
+| `/airmouse/safety/lidar_safe` | `std_msgs/msg/Bool` | Closest valid range is outside the stop distance |
 
 ## Frame contract
 
@@ -102,6 +108,13 @@ geofence, link-loss, battery, and mode failsafes. The companion owns sensing,
 mapping, survivor confidence, exploration, grid tagging, and high-level
 setpoints. A companion failure must leave the autopilot able to reject unsafe
 commands and enter a tested fallback mode.
+
+The current `lidar-safety` node is a conservative guard around the scripted
+simulation route. It validates scan freshness and valid-beam count, inflates
+the configured stop distance using the vehicle envelope and uncertainty
+margin, holds the current setpoint when a scan is unsafe, and requests PX4 RTL
+if the condition persists. A SLAM/frontier planner is still required for
+unknown-maze exploration.
 
 ## Replacement boundaries
 

@@ -32,6 +32,13 @@ def generate_launch_description():
             ),
             Node(
                 package="nidar_airmouse_sim",
+                executable="lidar-safety",
+                name="nidar_airmouse_lidar_safety",
+                parameters=[config],
+                output="screen",
+            ),
+            Node(
+                package="nidar_airmouse_sim",
                 executable="survivor-localizer",
                 name="nidar_airmouse_survivor_localizer",
                 parameters=[config],

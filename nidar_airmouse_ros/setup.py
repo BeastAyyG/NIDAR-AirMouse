@@ -24,6 +24,7 @@ setup(
             "gcs-status = nidar_airmouse_sim.gcs_status:main",
             "sim-smoke = nidar_airmouse_sim.sim_smoke:main",
             "sim-survivor-detector = nidar_airmouse_sim.sim_survivor_detector:main",
+            "lidar-safety = nidar_airmouse_sim.lidar_safety:main",
         ],
     },
 )

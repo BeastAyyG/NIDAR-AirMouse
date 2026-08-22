@@ -101,8 +101,18 @@ powershell -ExecutionPolicy Bypass -File .\AirMouse\Run-AirMouseSim.ps1 -Headles
 ```
 
 The expected simulation terminal evidence is `LAND/COMPLETE`, `armed:false`,
-and the configured two-marker synthetic validation. It is not physical-flight
-approval; use [`Safety-and-Test-Plan.md`](Safety-and-Test-Plan.md) for that.
+`lidar_ready:true`, `lidar_safe:true`, and the configured two-marker synthetic
+validation. Inspect the safety contract directly with:
+
+```bash
+ros2 topic echo /airmouse/safety/status --once
+ros2 topic hz /scan
+```
+
+If the status reports `waiting_for_scan` or `stale_scan`, do not arm. Check the
+Gazebo-to-ROS bridge log and confirm that `/scan` is publishing. This is not
+physical-flight approval; use [`Safety-and-Test-Plan.md`](Safety-and-Test-Plan.md)
+for that.
 
 ### Fast versus accurate mode
 
