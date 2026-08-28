@@ -23,6 +23,19 @@ source /opt/ros/jazzy/setup.bash
 bash ./run_airmouse_sim.sh
 ```
 
+On a clean Ubuntu 24.04 computer, the prerequisites and workspace can be
+installed with the repository's setup script:
+
+```bash
+git clone -b agent/fast-development-profile https://github.com/BeastAyyG/NIDAR-AirMouse.git
+cd NIDAR-AirMouse
+bash ./setup_ubuntu.sh
+```
+
+The script installs the verified Ubuntu 24.04 / ROS 2 Jazzy / Gazebo / PX4
+v1.17 baseline and builds the ROS package. It may ask for the Ubuntu password
+and may ask you to restart after PX4 toolchain installation.
+
 The launcher defaults to the `fast` development profile: 360 LiDAR samples at
 10 Hz and shadows disabled in the copied runtime world. This keeps the same
 real Gazebo/PX4 maze while making WSL2 development responsive. Use
@@ -110,6 +123,7 @@ ros2 topic hz /scan
 ├── AirMouse-Setup.md
 ├── Run-AirMouseSim.ps1
 ├── run_airmouse_sim.sh
+├── setup_ubuntu.sh
 ├── airmouse_gui_topdown.config
 ├── PX4-gazebo-models/
 │   ├── worlds/maze.sdf
