@@ -20,3 +20,7 @@ jobs:
           PYTHONPATH=nidar_airmouse_ros python -m pytest nidar_airmouse_ros/tests -q
       - name: Run grid + safety smoke check
         run: PYTHONPATH=nidar_airmouse_ros python -m nidar_airmouse_sim.sim_smoke
+      - name: Run headless mission walk (accurate)
+        run: PYTHONPATH=nidar_airmouse_ros python tools/headless_mission_smoke.py --profile accurate --quiet
+      - name: Run headless mission walk (fast)
+        run: PYTHONPATH=nidar_airmouse_ros python tools/headless_mission_smoke.py --profile fast --quiet
