@@ -14,3 +14,9 @@ jobs:
           python-version: "3.12"
       - name: Validate SDF geometry and nominal route
         run: python tools/validate_maze.py
+      - name: Run pure-Python unit tests
+        run: |
+          python -m pip install --quiet pytest
+          PYTHONPATH=nidar_airmouse_ros python -m pytest nidar_airmouse_ros/tests -q
+      - name: Run grid + safety smoke check
+        run: PYTHONPATH=nidar_airmouse_ros python -m nidar_airmouse_sim.sim_smoke
