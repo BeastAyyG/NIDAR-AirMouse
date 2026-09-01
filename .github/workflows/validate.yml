@@ -1,16 +1,33 @@
-name: Validate AirMouse maze
+name: Validate AirMouse simulation
 
 on:
   push:
   pull_request:
 
 jobs:
-  validate-maze:
+  validate:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        world:
+          - maze
+          - maze_compete
+        profile:
+          - fast
+          - accurate
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate SDF geometry and nominal route
-        run: python tools/validate_maze.py
+      - name: Validate every shipped SDF
+        run: python tools/validate_maze.py --world all
+      - name: Run pure-Python unit tests
+        run: |
+          python -m pip install --quiet pytest
+          PYTHONPATH=nidar_airmouse_ros python -m pytest nidar_airmouse_ros/tests -q
+      - name: Run grid + safety smoke check
+        run: PYTHONPATH=nidar_airmouse_ros python -m nidar_airmouse_sim.sim_smoke
+      - name: Headless mission walk (${{ matrix.world }}, ${{ matrix.profile }})
+        run: PYTHONPATH=nidar_airmouse_ros python tools/headless_mission_smoke.py --world ${{ matrix.world }} --profile ${{ matrix.profile }} --quiet

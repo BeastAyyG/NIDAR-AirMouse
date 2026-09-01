@@ -39,6 +39,8 @@ class MissionManager(Node):
         self.declare_parameter("precheck_seconds", 3.0)
         self.declare_parameter("hold_seconds", 2.0)
         self.declare_parameter("land_timeout_seconds", 15.0)
+        self.declare_parameter("require_lidar", True)
+        self.declare_parameter("safety_abort_timeout_seconds", 3.0)
         self.declare_parameter("geofence_x_min", -14.0)
         self.declare_parameter("geofence_x_max", 14.0)
         self.declare_parameter("geofence_y_min", -14.0)
@@ -72,6 +74,11 @@ class MissionManager(Node):
         self.disarm_requested = False
         self.abort_requested = False
         self.last_command_at = self.get_clock().now()
+        self.lidar_ready = False
+        self.lidar_safe = False
+        self.safety_emergency = False
+        self.safety_reason = "waiting_for_lidar"
+        self.safety_blocked_at = None
 
         self.state_pub = self.create_publisher(String, "/airmouse/mission_state", 10)
         self.status_pub = self.create_publisher(String, "/airmouse/mission_status", 10)
@@ -99,6 +106,7 @@ class MissionManager(Node):
             qos_profile_sensor_data,
         )
         self.create_subscription(String, "/airmouse/survivors/grid_tags", self.survivor_callback, 10)
+        self.create_subscription(String, "/airmouse/safety/status", self.safety_callback, 10)
 
         self.create_service(Trigger, "/airmouse/start", self.start_callback)
         self.create_service(Trigger, "/airmouse/abort", self.abort_callback)
@@ -158,7 +166,51 @@ class MissionManager(Node):
         except (TypeError, ValueError, AttributeError):
             self.get_logger().warning("Ignoring malformed survivor tag payload")
 
+    def safety_callback(self, message: String) -> None:
+        """Update the mission gate from the LiDAR safety supervisor."""
+        try:
+            payload = json.loads(message.data)
+            self.lidar_ready = bool(payload.get("lidar_ready", False))
+            self.lidar_safe = bool(payload.get("lidar_safe", False))
+            self.safety_emergency = bool(payload.get("emergency", False))
+            self.safety_reason = str(payload.get("reason", "unknown"))
+        except (TypeError, ValueError, AttributeError):
+            self.lidar_ready = False
+            self.lidar_safe = False
+            self.safety_emergency = False
+            self.safety_reason = "malformed_safety_status"
+
+    def apply_safety_guard(self) -> None:
+        """Hold on a bad LiDAR state, then request PX4 RTL if it persists."""
+        if not bool(self.get_parameter("require_lidar").value):
+            self.safety_blocked_at = None
+            return
+        if self.state in (
+            MissionState.BOOT,
+            MissionState.LAND_COMPLETE,
+            MissionState.ABORT,
+            MissionState.RETURN_HOME,
+        ):
+            self.safety_blocked_at = None
+            return
+
+        blocked = not self.lidar_ready or not self.lidar_safe
+        if not blocked:
+            self.safety_blocked_at = None
+            return
+        if self.safety_blocked_at is None:
+            self.safety_blocked_at = self.get_clock().now()
+        if not self.is_armed():
+            return
+        blocked_seconds = (
+            self.get_clock().now() - self.safety_blocked_at
+        ).nanoseconds / 1e9
+        timeout = float(self.get_parameter("safety_abort_timeout_seconds").value)
+        if self.safety_emergency or blocked_seconds >= timeout:
+            self.request_abort(f"LiDAR safety condition: {self.safety_reason}")
+
     def control_tick(self) -> None:
+        self.apply_safety_guard()
         self.publish_offboard_mode()
         self.publish_setpoint()
 
@@ -167,9 +219,7 @@ class MissionManager(Node):
 
         if self.position is not None and not self.inside_geofence():
             self.get_logger().error("PX4 position left the simulation geofence; aborting to RTL")
-            self.abort_requested = True
-            self.transition(MissionState.ABORT)
-            self.send_command(VehicleCommand.VEHICLE_CMD_NAV_RETURN_TO_LAUNCH)
+            self.request_abort("PX4 position left the simulation geofence")
             return
 
         if self.state == MissionState.PRECHECK:
@@ -261,6 +311,10 @@ class MissionManager(Node):
         self.setpoint_count += 1
 
     def target_for_state(self) -> tuple[float, float, float]:
+        if self.safety_hold_active():
+            if self.position is not None and self.position.xy_valid and self.position.z_valid:
+                return (float(self.position.x), float(self.position.y), float(self.position.z))
+            return self.home
         if self.state == MissionState.EXPLORE:
             return self.waypoints[self.path_index]
         if self.state == MissionState.RETURN_HOME:
@@ -289,7 +343,25 @@ class MissionManager(Node):
             and self.position.z_valid
             and self.vehicle_status is not None
             and self.vehicle_status.pre_flight_checks_pass
+            and (
+                not bool(self.get_parameter("require_lidar").value)
+                or (self.lidar_ready and self.lidar_safe and not self.safety_emergency)
+            )
         )
+
+    def safety_hold_active(self) -> bool:
+        """Return whether the current setpoint should hold the vehicle in place."""
+        if not bool(self.get_parameter("require_lidar").value):
+            return False
+        if self.state in (
+            MissionState.BOOT,
+            MissionState.PRECHECK,
+            MissionState.RETURN_HOME,
+            MissionState.LAND_COMPLETE,
+            MissionState.ABORT,
+        ):
+            return False
+        return not self.lidar_ready or not self.lidar_safe
 
     def send_command(self, command: int, param1: float = 0.0, param2: float = 0.0) -> None:
         message = VehicleCommand()
@@ -305,6 +377,15 @@ class MissionManager(Node):
         message.from_external = True
         self.command_pub.publish(message)
         self.last_command_at = self.get_clock().now()
+
+    def request_abort(self, reason: str) -> None:
+        """Request the tested PX4 return-to-launch action once."""
+        if self.abort_requested:
+            return
+        self.abort_requested = True
+        self.get_logger().error(reason)
+        self.transition(MissionState.ABORT)
+        self.send_command(VehicleCommand.VEHICLE_CMD_NAV_RETURN_TO_LAUNCH)
 
     def command_due(self) -> bool:
         return (self.get_clock().now() - self.last_command_at).nanoseconds >= 1_000_000_000
@@ -375,6 +456,9 @@ class MissionManager(Node):
                 "waypoint_index": self.path_index,
                 "waypoint_count": len(self.waypoints),
                 "validated_survivors": self.survivor_count,
+                "lidar_ready": self.lidar_ready,
+                "lidar_safe": self.lidar_safe,
+                "safety_reason": self.safety_reason,
             },
             sort_keys=True,
         )

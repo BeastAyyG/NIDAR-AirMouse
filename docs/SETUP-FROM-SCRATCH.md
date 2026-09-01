@@ -19,6 +19,25 @@ launcher converts its own location automatically.
 
 ## 2. Install the upstream dependencies
 
+For a clean Ubuntu 24.04 computer, the repository includes an automated path.
+It uses the same versions as the verified development environment:
+
+```bash
+git clone -b agent/fast-development-profile https://github.com/BeastAyyG/NIDAR-AirMouse.git
+cd NIDAR-AirMouse
+bash ./setup_ubuntu.sh
+```
+
+The script installs ROS 2 Jazzy, Gazebo dependencies, PX4 v1.17.0, the
+matching `px4_msgs` `release/1.17` branch, and Micro XRCE-DDS Agent v2.4.3,
+then builds the workspace. It must be run as a normal user because it invokes
+`sudo` only for system packages. It intentionally supports Ubuntu 24.04 only;
+Ubuntu 22.04 is a valid PX4 platform but is not the tested ROS 2 Jazzy target.
+
+If the script reports an existing checkout with local changes, preserve those
+changes and rerun after choosing separate paths with `AIR_MOUSE_PX4_ROOT`,
+`AIR_MOUSE_ROS_WS`, `AIR_MOUSE_XRCE_SOURCE`, and `AIR_MOUSE_XRCE_WS`.
+
 Inside Ubuntu, follow the official installation instructions for:
 
 - [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/Installation.html)
@@ -101,5 +120,36 @@ powershell -ExecutionPolicy Bypass -File .\AirMouse\Run-AirMouseSim.ps1 -Headles
 ```
 
 The expected simulation terminal evidence is `LAND/COMPLETE`, `armed:false`,
-and the configured two-marker synthetic validation. It is not physical-flight
-approval; use [`Safety-and-Test-Plan.md`](Safety-and-Test-Plan.md) for that.
+`lidar_ready:true`, `lidar_safe:true`, and the configured two-marker synthetic
+validation. Inspect the safety contract directly with:
+
+```bash
+ros2 topic echo /airmouse/safety/status --once
+ros2 topic hz /scan
+```
+
+If the status reports `waiting_for_scan` or `stale_scan`, do not arm. Check the
+Gazebo-to-ROS bridge log and confirm that `/scan` is publishing. This is not
+physical-flight approval; use [`Safety-and-Test-Plan.md`](Safety-and-Test-Plan.md)
+for that.
+
+### Fast versus accurate mode
+
+Use fast mode for day-to-day WSL2 development. It runs the same maze and PX4
+vehicle with a reduced 2D LiDAR configuration and shadows disabled:
+
+```bash
+AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+```
+
+Use accurate mode for sensor/rendering validation. It keeps the source LiDAR
+settings (1080 samples at 30 Hz) and maze shadows enabled:
+
+```bash
+AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+```
+
+`accurate` and `full` are equivalent names. Add `AIR_MOUSE_GUI=0` for a
+headless Linux or CI run. With the GUI enabled, the launcher requires the
+Camera Tracking service, repairs a stale GUI instance if needed, resumes the
+Gazebo world clock, and follows `x500_lidar_2d_0` with a wide room view.

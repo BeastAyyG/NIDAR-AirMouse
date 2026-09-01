@@ -61,13 +61,14 @@ At minimum, add automated tests for:
 1. Gazebo-to-PX4 ENU/NED conversion round trips.
 2. Route collision checks with multiple vehicle radii and uncertainty margins.
 3. Geofence rejection at every boundary.
-4. Duplicate survivor detections and grid-cell de-duplication.
-5. Detection confidence and temporal confirmation rules.
-6. Stale timestamps and delayed messages.
-7. Planner no-path, no-progress, and timeout handling.
-8. RTL/land/disarm state transitions after abort.
-9. Coverage of all six markers under randomized sensor noise.
-10. Clean startup/stop/restart without orphaned PX4, Gazebo, ROS, or agent processes.
+4. LiDAR clear, stale, invalid, stop-distance, and emergency-distance cases.
+5. Duplicate survivor detections and grid-cell de-duplication.
+6. Detection confidence and temporal confirmation rules.
+7. Stale timestamps and delayed messages.
+8. Planner no-path, no-progress, and timeout handling.
+9. RTL/land/disarm state transitions after LiDAR abort.
+10. Coverage of all six markers under randomized sensor noise.
+11. Clean startup/stop/restart without orphaned PX4, Gazebo, ROS, or agent processes.
 
 ## Evidence to save per flight
 

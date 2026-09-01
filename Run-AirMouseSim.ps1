@@ -1,6 +1,8 @@
 param(
     [string]$Distro = $(if ($env:AIR_MOUSE_WSL_DISTRO) { $env:AIR_MOUSE_WSL_DISTRO } else { "Ubuntu-24.04" }),
-    [switch]$Headless
+    [switch]$Headless,
+    [ValidateSet("fast", "full", "accurate")]
+    [string]$Profile = $(if ($env:AIR_MOUSE_PROFILE) { $env:AIR_MOUSE_PROFILE } else { "fast" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +18,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($wslScriptPath)) {
 }
 
 $guiValue = if ($Headless) { "0" } elseif ($env:AIR_MOUSE_GUI) { $env:AIR_MOUSE_GUI } else { "1" }
-wsl.exe -d $Distro -- env "AIR_MOUSE_GUI=$guiValue" bash $wslScriptPath.Trim()
+wsl.exe -d $Distro -- env "AIR_MOUSE_GUI=$guiValue" "AIR_MOUSE_PROFILE=$Profile" bash $wslScriptPath.Trim()
 if ($LASTEXITCODE -ne 0) {
     throw "The WSL AirMouse launcher failed with exit code $LASTEXITCODE."
 }
@@ -36,3 +38,4 @@ if (Test-Path -LiteralPath $qgroundControl) {
 }
 
 Write-Host "Verify with: wsl.exe -d $Distro -- bash -lc 'source /opt/ros/jazzy/setup.bash; source `$HOME/ros2_px4_ws/install/setup.bash; ros2 topic list'"
+Write-Host "Performance profile: $Profile (use -Profile accurate or full for full-fidelity LiDAR and shadows)."

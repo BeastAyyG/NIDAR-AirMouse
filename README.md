@@ -23,8 +23,50 @@ source /opt/ros/jazzy/setup.bash
 bash ./run_airmouse_sim.sh
 ```
 
+On a clean Ubuntu 24.04 computer, the prerequisites and workspace can be
+installed with the repository's setup script:
+
+```bash
+git clone -b agent/fast-development-profile https://github.com/BeastAyyG/NIDAR-AirMouse.git
+cd NIDAR-AirMouse
+bash ./setup_ubuntu.sh
+```
+
+The script installs the verified Ubuntu 24.04 / ROS 2 Jazzy / Gazebo / PX4
+v1.17 baseline and builds the ROS package. It may ask for the Ubuntu password
+and may ask you to restart after PX4 toolchain installation.
+
+The launcher defaults to the `fast` development profile: 360 LiDAR samples at
+10 Hz and shadows disabled in the copied runtime world. This keeps the same
+real Gazebo/PX4 maze while making WSL2 development responsive. Use
+`-Profile accurate` (or `-Profile full`) for the original 1080-sample, 30 Hz
+LiDAR and shadow settings.
+The launcher also resumes `/world/<name>/control` before starting the mission, so a
+previous Gazebo pause cannot leave PX4 waiting for sensor data.
+When the GUI is enabled, it loads the Camera Tracking plugin and follows
+`x500_lidar_2d_0` with a wide room view. If a stale Gazebo GUI was opened
+without that plugin, the launcher replaces it automatically.
 Use `-Headless` for CI or machines without a usable Gazebo GUI. The detailed
 setup is in [`AirMouse-Setup.md`](AirMouse-Setup.md).
+
+From Linux, select the profiles with the environment variable:
+
+```bash
+AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+AIR_MOUSE_GUI=0 AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh  # headless
+```
+
+Pick the arena with `AIR_MOUSE_WORLD`. `maze` is the 30 m x 30 m practice
+course (2 markers validated). `maze_compete` is the 15 m x 15 m competition
+arena (6 markers validated, serpentine route). The launcher copies the
+matching SDF, sets `PX4_GZ_WORLD`, points `ros_gz_bridge` at the world, and
+selects the matching `airmouse_*.yaml` for the ROS nodes:
+
+```bash
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+```
 
 For a clean machine, follow [`docs/SETUP-FROM-SCRATCH.md`](docs/SETUP-FROM-SCRATCH.md)
 first. The one-line PowerShell command is the project launcher after the
@@ -34,7 +76,8 @@ Validate the committed maze geometry and nominal route without starting
 Gazebo:
 
 ```bash
-python3 tools/validate_maze.py
+python3 tools/validate_maze.py            # validate the default ('maze') arena
+python3 tools/validate_maze.py --world all  # validate every shipped arena
 ```
 
 Run the ROS package unit tests from WSL after the ROS workspace is installed:
@@ -48,11 +91,42 @@ PYTHONPATH=nidar_airmouse_ros python3 -m pytest nidar_airmouse_ros/tests -q
 | Area | Current state |
 | --- | --- |
 | Flight stack | PX4 SITL, `gz_x500_lidar_2d`, offboard position setpoints |
-| Simulator | Gazebo maze world with 17 wall models and six visual markers |
+| Simulator | Two Gazebo arenas: `maze` (30 x 30 m, 17 walls, 6 markers) and `maze_compete` (15 x 15 m, 10 walls, 6 markers); selectable via `AIR_MOUSE_WORLD` |
 | ROS 2 | Jazzy package with mission, synthetic detector, localizer, and GCS status nodes |
 | Sensors | Simulated 2D LiDAR bridged to `/scan`; odometry bridged to `/odom` |
 | Mission | Takeoff, fixed safe route, simulated two-marker validation, RTL/land/disarm |
+| Runtime safety guard | LiDAR health/clearance gate, hold on close obstacle, RTL after persistent unsafe data |
 | Real autonomy | Not complete: no hardware driver/calibration, real detector, SLAM, or frontier planner |
+
+## How the constraints are applied
+
+The simulation now has a runtime LiDAR safety contract in addition to the
+offline maze validator and PX4 geofence. The `lidar-safety` node subscribes to
+`/scan` and publishes `/airmouse/safety/status`,
+`/airmouse/safety/lidar_ready`, and `/airmouse/safety/lidar_safe`.
+
+The configured stop distance is never allowed to be smaller than:
+
+```text
+vehicle envelope radius
++ LiDAR/localization uncertainty margin
++ minimum clearance
+```
+
+The mission manager refuses to arm until the LiDAR stream is healthy and clear.
+If a scan becomes invalid, stale, or too close to an obstacle during the
+mission, it holds the current position. If the unsafe state persists, it
+requests PX4 return-to-launch. The current guard uses the closest valid beam as
+a conservative all-around check; it does not yet replace the fixed waypoint
+route with SLAM or a frontier planner.
+
+Useful checks during a run:
+
+```bash
+ros2 topic echo /airmouse/safety/status
+ros2 topic echo /airmouse/mission_status
+ros2 topic hz /scan
+```
 
 ## Repository layout
 
@@ -61,12 +135,15 @@ PYTHONPATH=nidar_airmouse_ros python3 -m pytest nidar_airmouse_ros/tests -q
 ├── AirMouse-Setup.md
 ├── Run-AirMouseSim.ps1
 ├── run_airmouse_sim.sh
+├── setup_ubuntu.sh
 ├── airmouse_gui_topdown.config
 ├── PX4-gazebo-models/
 │   ├── worlds/maze.sdf
+│   ├── worlds/maze_compete.sdf
 │   └── models/x500_lidar_2d/
 ├── nidar_airmouse_ros/
 │   ├── config/airmouse.yaml
+│   ├── config/airmouse_compete.yaml
 │   ├── launch/airmouse_sim.launch.py
 │   └── nidar_airmouse_sim/
 └── docs/

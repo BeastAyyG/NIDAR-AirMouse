@@ -7,6 +7,15 @@ nidar_airmouse_mission:
     precheck_seconds: 3.0
     hold_seconds: 2.0
     land_timeout_seconds: 15.0
+    require_lidar: true
+    safety_abort_timeout_seconds: 3.0
+    vehicle_envelope_radius: 0.32
+    lidar_uncertainty_margin: 0.15
+    lidar_minimum_clearance: 0.08
+    lidar_stop_distance: 0.55
+    lidar_emergency_distance: 0.40
+    lidar_timeout_seconds: 0.5
+    lidar_min_valid_beams: 20
     geofence_x_min: -14.0
     geofence_x_max: 14.0
     geofence_y_min: -14.0
@@ -20,6 +29,16 @@ nidar_airmouse_mission:
     # These waypoints therefore map to the open south corridor in the SDF:
     # Gazebo (0,-6) -> local (-6,0), then Gazebo (-7,-6) -> local (-6,-7).
     mission_waypoints: [-6.0, 0.0, -2.5, -6.0, -7.0, -2.5, -6.0, 0.0, -2.5, -12.0, 0.0, -2.5, 0.0, 0.0, -2.5]
+
+nidar_airmouse_lidar_safety:
+  ros__parameters:
+    vehicle_envelope_radius: 0.32
+    lidar_uncertainty_margin: 0.15
+    lidar_minimum_clearance: 0.08
+    lidar_stop_distance: 0.55
+    lidar_emergency_distance: 0.40
+    lidar_timeout_seconds: 0.5
+    lidar_min_valid_beams: 20
 
 nidar_airmouse_survivor_localizer:
   ros__parameters:

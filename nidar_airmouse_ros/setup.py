@@ -11,7 +11,10 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", ["launch/airmouse_sim.launch.py"]),
-        ("share/" + package_name + "/config", ["config/airmouse.yaml"]),
+        (
+            "share/" + package_name + "/config",
+            ["config/airmouse.yaml", "config/airmouse_compete.yaml"],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -24,6 +27,7 @@ setup(
             "gcs-status = nidar_airmouse_sim.gcs_status:main",
             "sim-smoke = nidar_airmouse_sim.sim_smoke:main",
             "sim-survivor-detector = nidar_airmouse_sim.sim_survivor_detector:main",
+            "lidar-safety = nidar_airmouse_sim.lidar_safety:main",
         ],
     },
 )
