@@ -67,6 +67,17 @@ AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
 AIR_MOUSE_GUI=0 AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh  # headless
 ```
 
+World selection. `maze` is the original 30 m x 30 m practice arena. `maze_compete`
+is the new 15 m x 15 m competition arena (all six survivors reachable via a
+looped serpentine route). The launcher picks the matching SDF, world name,
+`ros_gz_bridge` topics, and ROS parameter file:
+
+```bash
+AIR_MOUSE_WORLD=maze bash ./run_airmouse_sim.sh
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=accurate AIR_MOUSE_GUI=0 bash ./run_airmouse_sim.sh  # headless
+```
+
 The launcher copies only the selected fast-profile runtime changes into
 `/tmp/airmouse_fast_models` and the PX4 runtime world. It does not modify the
 committed model source. Accurate mode uses the source sensor and shadow
@@ -89,6 +100,12 @@ The other four markers are not yet covered by the mission. Some are placed in
 narrow pockets, so a future planner must prove vehicle-envelope clearance
 before attempting them; the current scripted route is not complete maze
 exploration.
+
+For full-arena traversal, use `AIR_MOUSE_WORLD=maze_compete`. The
+competition arena is a 15 m x 15 m grid with five parallel corridors and a
+looped serpentine route that validates **all six** survivors (314 simulation
+steps under the fast profile, 1.30 m minimum static gap, 0.98 m post-envelope
+clearance).
 
 Useful checks:
 

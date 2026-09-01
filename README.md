@@ -41,7 +41,7 @@ The launcher defaults to the `fast` development profile: 360 LiDAR samples at
 real Gazebo/PX4 maze while making WSL2 development responsive. Use
 `-Profile accurate` (or `-Profile full`) for the original 1080-sample, 30 Hz
 LiDAR and shadow settings.
-The launcher also resumes `/world/maze/control` before starting the mission, so a
+The launcher also resumes `/world/<name>/control` before starting the mission, so a
 previous Gazebo pause cannot leave PX4 waiting for sensor data.
 When the GUI is enabled, it loads the Camera Tracking plugin and follows
 `x500_lidar_2d_0` with a wide room view. If a stale Gazebo GUI was opened
@@ -57,6 +57,17 @@ AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
 AIR_MOUSE_GUI=0 AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh  # headless
 ```
 
+Pick the arena with `AIR_MOUSE_WORLD`. `maze` is the 30 m x 30 m practice
+course (2 markers validated). `maze_compete` is the 15 m x 15 m competition
+arena (6 markers validated, serpentine route). The launcher copies the
+matching SDF, sets `PX4_GZ_WORLD`, points `ros_gz_bridge` at the world, and
+selects the matching `airmouse_*.yaml` for the ROS nodes:
+
+```bash
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=fast bash ./run_airmouse_sim.sh
+AIR_MOUSE_WORLD=maze_compete AIR_MOUSE_PROFILE=accurate bash ./run_airmouse_sim.sh
+```
+
 For a clean machine, follow [`docs/SETUP-FROM-SCRATCH.md`](docs/SETUP-FROM-SCRATCH.md)
 first. The one-line PowerShell command is the project launcher after the
 upstream prerequisites are installed.
@@ -65,7 +76,8 @@ Validate the committed maze geometry and nominal route without starting
 Gazebo:
 
 ```bash
-python3 tools/validate_maze.py
+python3 tools/validate_maze.py            # validate the default ('maze') arena
+python3 tools/validate_maze.py --world all  # validate every shipped arena
 ```
 
 Run the ROS package unit tests from WSL after the ROS workspace is installed:
@@ -79,7 +91,7 @@ PYTHONPATH=nidar_airmouse_ros python3 -m pytest nidar_airmouse_ros/tests -q
 | Area | Current state |
 | --- | --- |
 | Flight stack | PX4 SITL, `gz_x500_lidar_2d`, offboard position setpoints |
-| Simulator | Gazebo maze world with 17 wall models and six visual markers |
+| Simulator | Two Gazebo arenas: `maze` (30 x 30 m, 17 walls, 6 markers) and `maze_compete` (15 x 15 m, 10 walls, 6 markers); selectable via `AIR_MOUSE_WORLD` |
 | ROS 2 | Jazzy package with mission, synthetic detector, localizer, and GCS status nodes |
 | Sensors | Simulated 2D LiDAR bridged to `/scan`; odometry bridged to `/odom` |
 | Mission | Takeoff, fixed safe route, simulated two-marker validation, RTL/land/disarm |
@@ -127,9 +139,11 @@ ros2 topic hz /scan
 ├── airmouse_gui_topdown.config
 ├── PX4-gazebo-models/
 │   ├── worlds/maze.sdf
+│   ├── worlds/maze_compete.sdf
 │   └── models/x500_lidar_2d/
 ├── nidar_airmouse_ros/
 │   ├── config/airmouse.yaml
+│   ├── config/airmouse_compete.yaml
 │   ├── launch/airmouse_sim.launch.py
 │   └── nidar_airmouse_sim/
 └── docs/

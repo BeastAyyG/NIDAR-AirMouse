@@ -1,0 +1,89 @@
+nidar_airmouse_mission:
+  ros__parameters:
+    auto_start: false
+    simulation_mode: true
+    takeoff_altitude: 2.5
+    waypoint_acceptance: 0.8
+    precheck_seconds: 3.0
+    hold_seconds: 2.0
+    land_timeout_seconds: 15.0
+    require_lidar: true
+    safety_abort_timeout_seconds: 3.0
+    vehicle_envelope_radius: 0.32
+    lidar_uncertainty_margin: 0.15
+    lidar_minimum_clearance: 0.08
+    lidar_stop_distance: 0.55
+    lidar_emergency_distance: 0.40
+    lidar_timeout_seconds: 0.5
+    lidar_min_valid_beams: 20
+    # 15 m x 15 m arena. The usable interior is x/y = -7.3 .. +7.3 in Gazebo
+    # ENU, so the fence is held at +/-7.0 m and the corridor ends at +/-6.0 m.
+    geofence_x_min: -7.0
+    geofence_x_max: 7.0
+    geofence_y_min: -7.0
+    geofence_y_max: 7.0
+    geofence_z_min: -4.0
+    geofence_z_max: 0.5
+    # Serpentine sweep of the five north-south corridors in PX4 local NED.
+    # PX4 local NED uses x=north/y=east while Gazebo uses x=east/y=north, so
+    # px4_x = gazebo_y and px4_y = gazebo_x.
+    #
+    # Gazebo ENU route (18 points, first is home):
+    #   ( 0,  0) ( 0, -6) (-3, -6) (-3,  6) (-6,  6) (-6, -6)
+    #   (-6,  0) (-3,  0) (-3, -6) ( 0, -6) ( 0,  6) ( 3,  6)
+    #   ( 3, -6) ( 6, -6) ( 6,  6) ( 3,  6) ( 3,  0) ( 0,  0)
+    #
+    # Corridor centre lines are Gazebo x = -6, -3, 0, +3, +6. Every leg stays
+    # on a corridor centre line or passes through a doorway at its centre,
+    # which keeps 1.30 m to the nearest wall face.
+    mission_waypoints: [
+      -6.0,  0.0, -2.5,
+      -6.0, -3.0, -2.5,
+       6.0, -3.0, -2.5,
+       6.0, -6.0, -2.5,
+      -6.0, -6.0, -2.5,
+       0.0, -6.0, -2.5,
+       0.0, -3.0, -2.5,
+      -6.0, -3.0, -2.5,
+      -6.0,  0.0, -2.5,
+       6.0,  0.0, -2.5,
+       6.0,  3.0, -2.5,
+      -6.0,  3.0, -2.5,
+      -6.0,  6.0, -2.5,
+       6.0,  6.0, -2.5,
+       6.0,  3.0, -2.5,
+       0.0,  3.0, -2.5,
+       0.0,  0.0, -2.5,
+    ]
+
+nidar_airmouse_lidar_safety:
+  ros__parameters:
+    vehicle_envelope_radius: 0.32
+    lidar_uncertainty_margin: 0.15
+    lidar_minimum_clearance: 0.08
+    lidar_stop_distance: 0.55
+    lidar_emergency_distance: 0.40
+    lidar_timeout_seconds: 0.5
+    lidar_min_valid_beams: 20
+
+nidar_airmouse_survivor_localizer:
+  ros__parameters:
+    map_origin_x: 0.0
+    map_origin_y: 0.0
+    grid_cell_size: 1.0
+    min_observations: 2
+
+nidar_airmouse_sim_survivor_detector:
+  ros__parameters:
+    detection_radius: 2.5
+    # Marker positions converted from Gazebo ENU to PX4 local NED x/y.
+    # Gazebo ENU -> PX4 NED: (-6.7,-3.0) (-5.3,3.0) (-3.7,-3.0)
+    #                        (0.7,3.0)   (2.3,-3.0) (6.7,3.0)
+    survivor_targets: [
+      -3.0, -6.7, 0.5,
+       3.0, -5.3, 0.5,
+      -3.0, -3.7, 0.5,
+       3.0,  0.7, 0.5,
+      -3.0,  2.3, 0.5,
+       3.0,  6.7, 0.5,
+    ]

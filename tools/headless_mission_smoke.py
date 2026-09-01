@@ -25,75 +25,28 @@ import argparse
 import math
 import sys
 import time
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
-import yaml
+# Reuse the shared world/geometry parsing so this walker and the static
+# validator always see exactly the same arena.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "nidar_airmouse_ros"))
+from airmouse_worlds import (  # noqa: E402
+    DEFAULT_WORLD,
+    WORLD_SPECS,
+    load_mission_profile,
+    load_walls,
+    px4_to_gazebo,
+)
 
-from nidar_airmouse_sim.grid import GridConfig, cell_key, grid_to_world, world_to_grid
-from nidar_airmouse_sim.safety import assess_scan
-
-
-# ---------- Frame conversion ------------------------------------------------
-
-def px4_to_gazebo(x: float, y: float, z: float) -> tuple[float, float, float]:
-    """PX4 local NED (x=north, y=east, z=down) -> Gazebo ENU (x=east, y=north).
-
-    Mirrors the convention documented in ``docs/MAZE-SPEC.md``::
-
-        gazebo_x = px4_y_east
-        gazebo_y = px4_x_north
-        gazebo_z = -px4_z_down
-    """
-    return (y, x, -z)
+from nidar_airmouse_sim.grid import GridConfig, cell_key, grid_to_world, world_to_grid  # noqa: E402
+from nidar_airmouse_sim.safety import assess_scan  # noqa: E402
 
 
-def gazebo_to_px4(x: float, y: float, z: float) -> tuple[float, float, float]:
-    return (y, x, -z)
-
-
-# ---------- Maze geometry --------------------------------------------------
-
-def _floats(text: str | None) -> tuple[float, ...]:
-    return tuple(float(v) for v in (text or "").split())
-
-
-def load_walls(maze_sdf: Path) -> list[tuple[str, tuple[float, float, float, float]]]:
-    """Return [(name, (x_min, x_max, y_min, y_max))] for every wall model."""
-    root = ET.parse(maze_sdf).getroot()
-    world = root.find("world")
-    if world is None or world.attrib.get("name") != "maze":
-        raise SystemExit("maze.sdf is not a world named 'maze'")
-    rects: list[tuple[str, tuple[float, float, float, float]]] = []
-    for model in world.findall("model"):
-        name = model.attrib.get("name", "")
-        if not name.startswith("wall_"):
-            continue
-        pose = _floats(model.findtext("pose"))
-        size = _floats(model.find("./link/collision/geometry/box/size").text)
-        cx, cy = pose[0], pose[1]
-        sx, sy = size[0], size[1]
-        rects.append((name, (cx - sx / 2.0, cx + sx / 2.0, cy - sy / 2.0, cy + sy / 2.0)))
-    return rects
-
-
-def load_survivors_gz(maze_sdf: Path) -> dict[str, tuple[float, float, float]]:
-    """Return {name: (gx, gy, gz)} for every survivor, in Gazebo ENU."""
-    root = ET.parse(maze_sdf).getroot()
-    world = root.find("world")
-    out: dict[str, tuple[float, float, float]] = {}
-    for model in world.findall("model"):
-        name = model.attrib.get("name", "")
-        if not name.startswith("survivor_"):
-            continue
-        pose = _floats(model.findtext("pose"))
-        out[name] = (pose[0], pose[1], pose[2])
-    return out
+# ---------- Shared geometry helpers -----------------------------------------
+# px4_to_gazebo / load_walls / load_mission_profile / WORLD_SPECS / REPO_ROOT
+# all come from airmouse_worlds, which is shared with tools/validate_maze.py.
 
 
 # ---------- Synthetic LiDAR ------------------------------------------------
@@ -184,6 +137,7 @@ class WalkerConfig:
     detection_radius: float = 2.5
     grid: GridConfig = GridConfig()
     min_observations: int = 2
+    takeoff_altitude: float = 2.5
 
 
 @dataclass
@@ -211,6 +165,7 @@ class Simulator:
     samples: int
     update_rate: float
     profile: str
+    world: str = "maze"
     verbose: bool = True
     step_index: int = 0
     records: list[MissionRecord] = field(default_factory=list)
@@ -312,7 +267,7 @@ class Simulator:
 
     def run(self) -> tuple[str, list[MissionRecord]]:
         if self.verbose:
-            print(f"=== profile={self.profile} samples={self.samples} "
+            print(f"=== world={self.world} profile={self.profile} samples={self.samples} "
                   f"update_rate={self.update_rate}Hz waypoints={len(self.cfg.waypoints_px4)} ===")
             print(f"home_px4={self.cfg.home_px4}  home_gz={px4_to_gazebo(*self.cfg.home_px4)}")
 
@@ -325,7 +280,7 @@ class Simulator:
 
         # PRECHECK -> ARM/TAKEOFF (climb to takeoff altitude)
         self.state = "ARM/TAKEOFF"
-        climb_target = (home[0], home[1], home[2] + 2.5)
+        climb_target = (home[0], home[1], home[2] - self.cfg.takeoff_altitude)
         for pos in self.linear_path(home, climb_target):
             self.heartbeat_tick += 1
             self.record(state=self.state, px4_xyz=pos, notes=f"climb->{climb_target[2]:+.2f}m heartbeat={self.heartbeat_tick}")
@@ -334,8 +289,8 @@ class Simulator:
         # ARM/TAKEOFF -> HOME_ANCHOR (settle at home altitude for 2 s)
         self.state = "HOME_ANCHOR"
         self.record(state=self.state, px4_xyz=climb_target, notes="home anchor hold")
-        # Resolve real home after the climb
-        real_home = (home[0], home[1], home[2] + 2.5)
+        # The mission proper starts at the takeoff altitude.
+        real_home = climb_target
 
         # HOME_ANCHOR -> EXPLORE (fly the route)
         self.state = "EXPLORE"
@@ -368,7 +323,7 @@ class Simulator:
 
         # MARK_GRID -> RETURN_HOME
         self.state = "RETURN_HOME"
-        home_after = (0.0, 0.0, -2.5)
+        home_after = (self.cfg.home_px4[0], self.cfg.home_px4[1], -self.cfg.takeoff_altitude)
         for pos in self.linear_path(previous, home_after):
             self.heartbeat_tick += 1
             rec = self.record(state=self.state, px4_xyz=pos, notes=f"RTL heartbeat={self.heartbeat_tick}")
@@ -388,80 +343,72 @@ class Simulator:
 
 # ---------- Entry point -----------------------------------------------------
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--maze", type=Path, default=REPO_ROOT / "PX4-gazebo-models" / "worlds" / "maze.sdf")
-    parser.add_argument("--config", type=Path, default=REPO_ROOT / "nidar_airmouse_ros" / "config" / "airmouse.yaml")
-    parser.add_argument("--profile", choices=["fast", "accurate"], default="accurate")
-    parser.add_argument("--quiet", action="store_true", help="only print the summary")
-    parser.add_argument("--limit", type=int, default=20, help="show at most this many sample steps in the summary")
-    args = parser.parse_args()
+def run_world(name: str, profile: str, *, quiet: bool, limit: int) -> int:
+    """Walk one arena end to end, print the trace, and assert the outcome."""
+    spec = WORLD_SPECS[name]
+    walls = load_walls(spec.sdf, spec.name)
+    wall_names = {wall_name for wall_name, _ in walls}
+    if wall_names != spec.expected_walls:
+        raise SystemExit(
+            f"[{spec.name}] wall set mismatch: {sorted(wall_names ^ spec.expected_walls)}"
+        )
 
-    walls = load_walls(args.maze)
-    expected_wall_names = {
-        "wall_a", "wall_b", "wall_c", "wall_d", "wall_e", "wall_f", "wall_g",
-        "wall_h1", "wall_h2", "wall_h3", "wall_h4", "wall_v1", "wall_v2",
-        "wall_outer_west", "wall_outer_east", "wall_outer_south", "wall_outer_north",
-    }
-    wall_names = {name for name, _ in walls}
-    if wall_names != expected_wall_names:
-        raise SystemExit(f"wall set mismatch: {wall_names ^ expected_wall_names}")
-
-    with open(args.config) as f:
-        yaml_cfg = yaml.safe_load(f)
-    raw_waypoints = yaml_cfg["nidar_airmouse_mission"]["ros__parameters"]["mission_waypoints"]
-    waypoints = [tuple(raw_waypoints[i:i + 3]) for i in range(0, len(raw_waypoints), 3)]
-    raw_targets = yaml_cfg["nidar_airmouse_sim_survivor_detector"]["ros__parameters"]["survivor_targets"]
-    survivor_targets = [tuple(raw_targets[i:i + 3]) for i in range(0, len(raw_targets), 3)]
-    survivor_records = [(f"survivor_{i + 1:02d}", survivor_targets[i]) for i in range(len(survivor_targets))]
-
-    samples = 1080 if args.profile == "accurate" else 360
-    update_rate = 30.0 if args.profile == "accurate" else 10.0
+    mission = load_mission_profile(spec.config)
+    samples = 1080 if profile == "accurate" else 360
+    update_rate = 30.0 if profile == "accurate" else 10.0
 
     cfg = WalkerConfig(
-        waypoints_px4=waypoints,
-        home_px4=(0.0, 0.0, -2.5),
-        survivors_px4=survivor_records,
+        waypoints_px4=mission.waypoints_px4,
+        home_px4=(0.0, 0.0, 0.0),
+        survivors_px4=mission.survivors_px4,
+        detection_radius=mission.detection_radius,
+        min_observations=mission.min_observations,
+        takeoff_altitude=mission.takeoff_altitude,
     )
     sim = Simulator(walls=walls, cfg=cfg, samples=samples, update_rate=update_rate,
-                    profile=args.profile, verbose=not args.quiet)
+                    profile=profile, world=spec.name, verbose=not quiet)
 
     start = time.time()
     final_state, records = sim.run()
     elapsed = time.time() - start
 
-    if args.quiet:
-        print(f"profile={args.profile} steps={len(records)} final={final_state} wall_time={elapsed:.2f}s")
+    if quiet:
+        print(f"world={spec.name} profile={profile} steps={len(records)} "
+              f"final={final_state} wall_time={elapsed:.2f}s")
 
     print()
     print("=" * 84)
-    print(f"Summary (profile={args.profile}, samples={samples} @ {update_rate:g} Hz)")
+    print(f"Summary (world={spec.name}, profile={profile}, samples={samples} @ {update_rate:g} Hz)")
     print("=" * 84)
-    print(f"  walls            : {len(walls)} ({sorted(wall_names)})")
-    print(f"  survivor markers : {len(survivor_records)}")
-    print(f"  mission waypoints: {len(waypoints)}")
+    print(f"  walls            : {len(walls)} ({', '.join(sorted(wall_names))})")
+    print(f"  survivor markers : {len(mission.survivors_px4)}")
+    print(f"  mission waypoints: {len(mission.waypoints_px4)}")
     print(f"  steps simulated  : {len(records)}")
     print(f"  wall clock       : {elapsed:.2f}s")
     print(f"  final state      : {final_state}")
     final = records[-1]
-    print(f"  final position   : PX4={tuple(round(v, 2) for v in final.position_px4)} GZ={tuple(round(v, 2) for v in final.position_gz)}")
+    print(f"  final position   : PX4={tuple(round(v, 2) for v in final.position_px4)} "
+          f"GZ={tuple(round(v, 2) for v in final.position_gz)}")
     print(f"  validated        : {final.validated_survivors}")
     bad = [r for r in records if not r.safety_safe or not r.safety_ready]
     print(f"  safety pass rate : {len(records) - len(bad)}/{len(records)} ready+safe")
     if bad:
         print(f"  safety failures  :")
-        for r in bad[: args.limit]:
-            print(f"      step={r.step_index} {r.state:18s} px4=({r.position_px4[0]:+.2f},{r.position_px4[1]:+.2f},{r.position_px4[2]:+.2f}) reason={r.safety_reason}")
+        for r in bad[:limit]:
+            print(f"      step={r.step_index} {r.state:18s} "
+                  f"px4=({r.position_px4[0]:+.2f},{r.position_px4[1]:+.2f},{r.position_px4[2]:+.2f}) "
+                  f"reason={r.safety_reason}")
     print(f"  unique safety reasons: {sorted({r.safety_reason for r in records})}")
 
-    # Show the LiDAR minimum range distribution and the bearing distribution.
     mins = sorted(r.lidar_min for r in records)
-    print(f"  LiDAR min range  : min={mins[0]:.2f}m  median={mins[len(mins) // 2]:.2f}m  max={mins[-1]:.2f}m")
-    tight = sorted(records, key=lambda r: r.lidar_min)[:5]
+    print(f"  LiDAR min range  : min={mins[0]:.2f}m  median={mins[len(mins) // 2]:.2f}m "
+          f"max={mins[-1]:.2f}m")
     print(f"  tightest 5 steps (lowest LiDAR min range):")
-    for r in tight:
-        print(f"      step={r.step_index:3d} {r.state:18s} px4=({r.position_px4[0]:+.2f},{r.position_px4[1]:+.2f},{r.position_px4[2]:+.2f}) "
-              f"lidar={r.lidar_min:.2f}m@{r.lidar_min_bearing_deg:+.1f}deg wall={r.lidar_min_wall}")
+    for r in sorted(records, key=lambda r: r.lidar_min)[:5]:
+        print(f"      step={r.step_index:3d} {r.state:18s} "
+              f"px4=({r.position_px4[0]:+.2f},{r.position_px4[1]:+.2f},{r.position_px4[2]:+.2f}) "
+              f"lidar={r.lidar_min:.2f}m@{r.lidar_min_bearing_deg:+.1f}deg "
+              f"wall={r.lidar_min_wall}")
 
     print(f"  walls ever seen as nearest:")
     wall_counts: dict[str, int] = {}
@@ -471,30 +418,65 @@ def main() -> int:
     for wall_name in sorted(wall_counts):
         print(f"      {wall_name:<22s} {wall_counts[wall_name]} steps")
 
-    print(f"  survivor first-contact events:")
-    for sid in sorted({r.in_range_survivors[0] for r in records if r.in_range_survivors}):
+    # Every marker that ever entered the detection radius, in first-seen order.
+    print(f"  survivor contact windows (detection radius {cfg.detection_radius:.2f} m):")
+    contacted: list[str] = []
+    for r in records:
+        for sid in r.in_range_survivors:
+            if sid not in contacted:
+                contacted.append(sid)
+    for sid in sorted(contacted):
         first = next(r for r in records if sid in r.in_range_survivors)
         last = next(r for r in reversed(records) if sid in r.in_range_survivors)
-        print(f"      {sid}: first step={first.step_index} px4=({first.position_px4[0]:+.2f},{first.position_px4[1]:+.2f}), "
-              f"last step={last.step_index} px4=({last.position_px4[0]:+.2f},{last.position_px4[1]:+.2f})")
+        hits = sum(1 for r in records if sid in r.in_range_survivors)
+        verdict = "validated" if sid in final.validated_survivors else "NOT validated"
+        print(f"      {sid}: steps {first.step_index}-{last.step_index} ({hits} steps) "
+              f"first px4=({first.position_px4[0]:+.2f},{first.position_px4[1]:+.2f}) -> {verdict}")
 
-    # Hard assertions on the final outcome.
+    failures: list[str] = []
     if final_state != "LAND/COMPLETE":
-        print(f"FAIL: final state {final_state} != LAND/COMPLETE")
-        return 1
-    home_after = (0.0, 0.0, -2.5)
-    if math.hypot(final.position_px4[0] - home_after[0], final.position_px4[1] - home_after[1]) > 0.05:
-        print(f"FAIL: did not return to home")
-        return 1
-    if "survivor_02" not in final.validated_survivors:
-        print("FAIL: did not validate survivor_02")
-        return 1
-    if "survivor_03" not in final.validated_survivors:
-        print("FAIL: did not validate survivor_03")
-        return 1
+        failures.append(f"final state {final_state} != LAND/COMPLETE")
+    home_xy = (cfg.home_px4[0], cfg.home_px4[1])
+    if math.hypot(final.position_px4[0] - home_xy[0], final.position_px4[1] - home_xy[1]) > 0.05:
+        failures.append(f"did not return to home {home_xy}")
+    if bad:
+        failures.append(f"{len(bad)} step(s) violated the LiDAR safety contract")
+    for sid in sorted(spec.expected_validated):
+        if sid not in final.validated_survivors:
+            failures.append(f"did not validate {sid}")
+
     print()
-    print("ALL ASSERTIONS PASSED")
+    if failures:
+        for failure in failures:
+            print(f"  FAIL: {failure}")
+        return 1
+    print(f"  ALL ASSERTIONS PASSED (world={spec.name}, profile={profile})")
     return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Headless mission walk over a committed AirMouse arena."
+    )
+    parser.add_argument(
+        "--world",
+        choices=[*sorted(WORLD_SPECS), "all"],
+        default=DEFAULT_WORLD,
+        help="which arena to walk (default: %(default)s)",
+    )
+    parser.add_argument("--profile", choices=["fast", "accurate"], default="accurate")
+    parser.add_argument("--quiet", action="store_true", help="only print the summary")
+    parser.add_argument(
+        "--limit", type=int, default=20,
+        help="show at most this many safety failures in the summary",
+    )
+    args = parser.parse_args()
+
+    names = sorted(WORLD_SPECS) if args.world == "all" else [args.world]
+    failures = 0
+    for name in names:
+        failures += run_world(name, args.profile, quiet=args.quiet, limit=args.limit)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
