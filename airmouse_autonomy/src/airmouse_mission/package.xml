@@ -19,6 +19,8 @@
   <exec_depend>airmouse_interfaces</exec_depend>
   <exec_depend>airmouse_mapping</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <!-- px4_msgs comes from the existing PX4 workspace (no new third-party code). -->
+  <exec_depend>px4_msgs</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
 

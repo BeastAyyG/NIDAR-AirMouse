@@ -23,6 +23,7 @@ Executables (one thin rclpy adapter per package):
     airmouse_exploration/exploration_node
     airmouse_navigation/navigation_node
     airmouse_mission/mission_node
+    airmouse_mission/offboard_bridge   (px4_msgs; start_offboard:=false to skip)
     airmouse_localization/localization_node
 """
 
@@ -30,6 +31,7 @@ import os
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -179,6 +181,14 @@ def _launch_setup(context, *args, **kwargs):
     common = {'use_sim_time': True}
     nodes = [
         Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='camera_tf',
+            arguments=['0.10', '0.0', '0.05', '0', '0', '0',
+                       'base_link', 'camera_link'],
+            output='screen',
+        ),
+        Node(
             package='airmouse_mapping',
             executable='mapping_node',
             name='mapping_node',
@@ -221,6 +231,15 @@ def _launch_setup(context, *args, **kwargs):
             output='screen',
         ),
         Node(
+            package='airmouse_mission',
+            executable='offboard_bridge',
+            name='offboard_bridge',
+            parameters=[common, {'rate_hz': 10.0, 'cmd_topic': '/cmd_vel',
+                                 'odom_topic': '/odom'}],
+            condition=IfCondition(LaunchConfiguration('start_offboard')),
+            output='screen',
+        ),
+        Node(
             package='airmouse_localization',
             executable='localization_node',
             name='localization_node',
@@ -239,6 +258,12 @@ def generate_launch_description():
             default_value=os.path.join('config', 'mission.yaml'),
             description='Mission YAML path (sibling mapping.yaml, '
                         'perception.yaml and survivor.yaml are auto-loaded).',
+        ),
+        DeclareLaunchArgument(
+            'start_offboard',
+            default_value='true',
+            description='Start the PX4 offboard velocity bridge '
+                        '(requires px4_msgs; set false without PX4).',
         ),
         OpaqueFunction(function=_launch_setup),
     ])

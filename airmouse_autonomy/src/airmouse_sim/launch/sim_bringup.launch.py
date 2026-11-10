@@ -40,10 +40,17 @@ def _resolve_world(context):
 def _launch_setup(context, *args, **kwargs):
     world_path = _resolve_world(context)
     bridge_config = LaunchConfiguration('bridge_config').perform(context)
+    headless = LaunchConfiguration('headless').perform(context).lower() in (
+        'true', '1', 'yes')
 
+    cmd = ['gz', 'sim']
+    if headless:
+        # Server-only with offscreen rendering so rgbd_camera still publishes
+        # (no GUI/display required on the target machine).
+        cmd += ['-s', '--headless-rendering']
+    cmd += ['-r', '--render-engine', 'ogre2', world_path]
     gz_sim = ExecuteProcess(
-        # -r runs the simulation immediately; ogre2 is required by rgbd_camera.
-        cmd=['gz', 'sim', '-r', '--render-engine', 'ogre2', world_path],
+        cmd=cmd,
         output='screen',
         name='gz_sim',
     )
@@ -76,6 +83,12 @@ def generate_launch_description():
             'bridge_config',
             default_value=default_bridge,
             description='ros_gz_bridge YAML config file.',
+        ),
+        DeclareLaunchArgument(
+            'headless',
+            default_value='false',
+            description='Server-only Gazebo with offscreen rendering '
+                        '(no display; rgbd_camera still publishes).',
         ),
         # model:// URIs in the worlds must resolve to our shipped models.
         SetEnvironmentVariable(
