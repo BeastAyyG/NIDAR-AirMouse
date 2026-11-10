@@ -1,0 +1,6 @@
+string state
+float32 explored_pct
+float32 accessible_pct
+int32 survivor_count
+bool mission_complete
+float64 timestamp

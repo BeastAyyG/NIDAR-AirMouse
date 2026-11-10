@@ -1,0 +1,355 @@
+<?xml version="1.0"?>
+<!--
+  AirMouse scenario world: moving_obstacles
+  12x12 arena with two dynamic obstacles (obstacle_mover_1/2).
+  IMPORTANT: neither mover has a motion plugin.  Their trajectories are
+  driven at runtime by the validation node through gz set_pose, e.g.
+    gz service -s /world/moving_obstacles/set_pose
+  with request type gz.msgs.Pose, reply type gz.msgs.Boolean, and a
+  request naming the entity:
+    name: "obstacle_mover_1", position: {x: 5, y: 8, z: 0.5}
+  Do not add trajectory plugins here: motion must stay runtime-driven so
+  the replay/validation harness stays in control.
+
+  Frame: Gazebo ENU (x forward, y left, z up), metres.
+  Arena walls: 0.2 m thick, 2.0 m high.  Drone spawns at (1, 1, 0.5).
+  Sensors: RGB-D sensor topic "camera" (gz /camera/...) and IMU topic
+  "imu" (gz /imu); see airmouse_sensors/config/gz_bridge.yaml and
+  airmouse_sensors/README.md.  PX4 SITL is launched separately.
+  Survivor markers are static cylinders survivor_1..survivor_N (max 6).
+-->
+<sdf version="1.10">
+  <world name="moving_obstacles">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <!-- Ground plane (inline, no fuel/model:// dependency). -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.30 0.30 0.30 1</ambient>
+            <diffuse>0.55 0.55 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.85 0.85 0.85 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <!-- AirMouse X500 with RGB-D + IMU (spawn pose is fixed by contract). -->
+    <include>
+      <uri>model://airmouse_x500_rgbd</uri>
+      <name>airmouse</name>
+      <pose>1 1 0.5 0 0 0</pose>
+    </include>
+    <model name="wall_south">
+      <static>true</static>
+      <pose>6 0 1 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>12.2 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>12.2 0.2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.68 0.68 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_north">
+      <static>true</static>
+      <pose>6 12 1 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>12.2 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>12.2 0.2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.68 0.68 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_west">
+      <static>true</static>
+      <pose>0 6 1 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 12.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 12.2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.68 0.68 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_east">
+      <static>true</static>
+      <pose>12 6 1 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 12.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 12.2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.68 0.68 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="obstacle_fixed_1">
+      <static>true</static>
+      <pose>3 8 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.35 0.45 0.55 1</ambient>
+            <diffuse>0.35 0.45 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="obstacle_fixed_2">
+      <static>true</static>
+      <pose>9 3 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.35 0.45 0.55 1</ambient>
+            <diffuse>0.35 0.45 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Survivor marker: static colored cylinder, 1.2 m tall. -->
+    <model name="survivor_1">
+      <static>true</static>
+      <pose>11 10 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.15</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.15</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.9 0.1 0.1 1</ambient>
+            <diffuse>0.9 0.1 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Survivor marker: static colored cylinder, 1.2 m tall. -->
+    <model name="survivor_2">
+      <static>true</static>
+      <pose>10 2 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.15</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.15</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.25 0.9 1</ambient>
+            <diffuse>0.1 0.25 0.9 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Dynamic obstacle: no plugin is authored.  The validation node
+         drives its pose at runtime with `gz service .../set_pose`. -->
+    <model name="obstacle_mover_1">
+      <static>false</static>
+      <pose>5 5 0.5 0 0 0</pose>
+      <link name="link">
+        <gravity>false</gravity>
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.1133</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.1133</iyy>
+            <iyz>0</iyz>
+            <izz>0.06</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.6 0.6 1.0</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.6 0.6 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.45 0.1 1</ambient>
+            <diffuse>0.95 0.45 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Dynamic obstacle: no plugin is authored.  The validation node
+         drives its pose at runtime with `gz service .../set_pose`. -->
+    <model name="obstacle_mover_2">
+      <static>false</static>
+      <pose>8 7 0.5 0 0 0</pose>
+      <link name="link">
+        <gravity>false</gravity>
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.1133</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.1133</iyy>
+            <iyz>0</iyz>
+            <izz>0.06</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.6 0.6 1.0</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.6 0.6 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.15 0.55 1</ambient>
+            <diffuse>0.85 0.15 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

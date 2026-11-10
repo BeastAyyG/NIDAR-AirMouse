@@ -121,3 +121,22 @@ attribution when redistributing that content.
 - [PX4 ROS 2 offboard control](https://docs.px4.io/main/en/ros/ros2_offboard_control)
 - [ROS 2 Jazzy documentation](https://docs.ros.org/en/jazzy/)
 - [QGroundControl documentation](https://docs.qgroundcontrol.com/master/en/)
+
+## Simulation-first autonomy workspace (offline-verified)
+
+`airmouse_autonomy/` adds a self-contained ROS 2 Humble workspace implementing
+the simulation-first roadmap Goals 1-8 alongside the existing baseline:
+occupancy mapping, frontier exploration, footprint-clear A*, survivor tracking,
+mission FSM, an X500 RGB-D model, 12 scenario worlds and an offline validation
+harness.
+
+Everything verifiable without ROS is verified: 201 pytest tests and 122 static
+workspace checks pass, and the offline replay completes the mission (99.7%
+explored, map F1 0.982, 0 collisions). Runtime items (colcon build, Gazebo,
+PX4 offboard, TF, rosbags) are explicitly UNVERIFIED until run on the Ubuntu
+target; see the Goal-0 checklist.
+
+- [Workspace README](airmouse_autonomy/README.md)
+- [Design spec](docs/superpowers/specs/2026-11-11-airmouse-autonomy-design.md)
+- [Implementation plan](docs/superpowers/plans/2026-11-11-airmouse-autonomy.md)
+- [Sample validation report](airmouse_autonomy/reports/report.md)

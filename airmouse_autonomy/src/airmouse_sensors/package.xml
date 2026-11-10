@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>airmouse_sensors</name>
+  <version>0.1.0</version>
+  <description>
+    Sensor bridge configuration for AirMouse: maps the Gazebo (gz) RGB-D
+    camera and IMU topics of the simulated X500 onto the roadmap ROS topics
+    (/camera/color/image_raw, /camera/depth/image_rect_raw, camera_info,
+    /camera/depth/color/points, /camera/imu) and /clock.
+  </description>
+  <maintainer email="dev@local">airmouse</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

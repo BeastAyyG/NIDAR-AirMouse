@@ -1,0 +1,12 @@
+# Depth / point-cloud / obstacle perception parameters.
+perception:
+  depth_min_m: 0.2
+  depth_max_m: 8.0
+  floor_z_m: 0.15               # points below treated as floor
+  ceil_z_m: 2.2                 # points above treated as ceiling
+  flight_band_zmin_m: 0.3
+  flight_band_zmax_m: 2.0
+  voxel_size_m: 0.05
+  hfov_rad: 1.2                 # camera horizontal FOV for region split
+  regions: 3                    # left / centre / right
+  representative_percentile: 20
