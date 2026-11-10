@@ -64,7 +64,7 @@ with offscreen rendering so the RGB-D camera still publishes).
   to a declared `console_scripts` entry (catches launch typos before colcon);
 - expected-topic list extended with the PX4 bridge topics and `/odom`.
 
-Checks grew from 122 to **142**; all pass.
+Checks grew from 122 to **144**; all pass.
 
 ### 5. One-command replay and smoke scripts
 
@@ -87,9 +87,9 @@ Checks grew from 122 to **142**; all pass.
 
 ## Evidence
 
-- `cd airmouse_autonomy && python -m pytest`: **211 passed** (the workspace is
+- `cd airmouse_autonomy && python -m pytest`: **218 passed** (the workspace is
   self-contained; its own `conftest.py`/`pytest.ini` provide the import paths).
-- `python airmouse_autonomy/tools/verify_workspace.py`: **142/142 checks**.
+- `python airmouse_autonomy/tools/verify_workspace.py`: **144/144 checks**.
 - Offline replay unchanged: mission complete, 99.7% explored, map F1 0.982,
   0 collisions, 3/3 survivors.
 

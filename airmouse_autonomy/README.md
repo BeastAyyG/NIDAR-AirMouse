@@ -16,8 +16,8 @@ ROS-independent (numpy + stdlib) so they can be tested without ROS.
 
 **Verified offline on this machine (Windows, no ROS):**
 
-- 211 pytest tests across every algorithm core (`cd airmouse_autonomy && python -m pytest`).
-- `python airmouse_autonomy/tools/verify_workspace.py` → **142/142 static
+- 218 pytest tests across every algorithm core (`cd airmouse_autonomy && python -m pytest`).
+- `python airmouse_autonomy/tools/verify_workspace.py` → **144/144 static
   checks** (package metadata, entry points, core purity, 12 SDF worlds parse,
   RGB-D model, YAML configs, launch compile, topic coverage).
 - Offline mission replay (`airmouse_autonomy/reports/`): mission completes in
@@ -57,8 +57,11 @@ airmouse_autonomy/
 │   └── airmouse_validation/   # offline replay, metrics, report generator
 ├── config/                    # mission / mapping / perception / survivor YAML
 ├── reports/                   # sample validation report (generated)
+├── docs/                      # design + handoff docs (VIDEO-PIPELINE.md, ...)
 ├── tools/verify_workspace.py  # offline static verifier
-└── scripts/check_env.sh       # Goal-0 environment diagnostics (Ubuntu)
+├── scripts/                   # check_env.sh, record_mission.sh,
+│                              # export_bag.py, render_video.py, ...
+└── conftest.py / pytest.ini   # self-contained test bootstrap
 ```
 
 Cores never import rclpy; each `*_node.py` is a thin adapter that converts ROS
@@ -164,6 +167,22 @@ bash airmouse_autonomy/scripts/smoke_mission.sh full_mission.sdf 40
 Sample output is committed in `airmouse_autonomy/reports/` (`report.md`,
 `map.png`, `result.json`). On the Ubuntu machine, run each scenario and score
 it with `airmouse_validation`; record bags under `bags/`.
+
+## Mission film (bag → video)
+
+One documented path from a recorded mission to a reproducible MP4: record the
+bag (`scripts/record_mission.sh`), export a clip (`scripts/export_bag.py` — the
+only ROS-dependent step), then render anywhere (`scripts/render_video.py`;
+Python + numpy + pygame + ffmpeg, no ROS).
+
+```bash
+cd airmouse_autonomy
+python scripts/render_video.py --synthetic demo_clip --out demo.mp4   # sanity
+python scripts/render_video.py --clip /path/to/clip --out film.mp4    # real clip
+```
+
+Requirements, folder layout, troubleshooting and the handoff checklist are in
+[docs/VIDEO-PIPELINE.md](docs/VIDEO-PIPELINE.md) (see "For Manoj's computer").
 
 ### Acceptance targets (from the roadmap)
 
