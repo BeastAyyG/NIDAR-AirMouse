@@ -16,6 +16,9 @@ rosbag2 (.db3)  ──export_bag.py──▶  clip/  ──render_video.py──
 - **Render** — `scripts/render_video.py` (Windows/macOS/Linux; needs Python,
   numpy, pygame, ffmpeg — no ROS)
 
+**Owner / point of contact:** Manoj — owns the render step and the clip handoff
+(see [For Manoj's computer](#for-manojs-computer)).
+
 The clip format is documented in
 `src/airmouse_validation/airmouse_validation/clip.py`. Arrays are `.npy`
 (lossless depth/map, no image codecs); scalars and file paths are in
