@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mission_node = airmouse_mission.mission_node:main",
+            "offboard_bridge = airmouse_mission.offboard_bridge_node:main",
         ],
     },
 )

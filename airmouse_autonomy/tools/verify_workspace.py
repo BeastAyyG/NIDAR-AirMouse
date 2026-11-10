@@ -39,6 +39,8 @@ EXPECTED_TOPICS = [
     "/camera/color/camera_info", "/camera/depth/color/points", "/camera/imu",
     "/map", "/obstacles", "/survivors", "/goal", "/path", "/cmd_vel",
     "/mission_status", "/mission_state", "/mission_command", "/mission_complete",
+    "/fmu/in/offboard_control_mode", "/fmu/in/trajectory_setpoint",
+    "/fmu/in/vehicle_command", "/odom",
 ]
 MSG_FIELDS = {
     "ObstacleRegions.msg": {"min_distance", "representative", "count"},
@@ -94,6 +96,68 @@ def _imports_rclpy(file: Path) -> bool:
             if node.module.split(".")[0] in {"rclpy", "tf2_ros"}:
                 return True
     return False
+
+
+def _console_scripts(pkg: Path) -> dict[str, str]:
+    """executable -> module:function map declared in a package's setup.py."""
+    setup = pkg / "setup.py"
+    if not setup.is_file():
+        return {}
+    try:
+        tree = ast.parse(setup.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return {}
+    entry_map = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.keyword) and node.arg in ("entry_points",
+                                                          "console_scripts"):
+            try:
+                entry_map = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError):
+                entry_map = None
+    scripts: dict[str, str] = {}
+    if isinstance(entry_map, dict):
+        for item in entry_map.get("console_scripts", []):
+            if "=" in item:
+                exe, target = item.split("=", 1)
+                scripts[exe.strip()] = target.strip()
+    return scripts
+
+
+def check_launch_nodes() -> None:
+    """Every Node(package=..., executable=...) in a launch file must resolve."""
+    pkgs_by_name = {pkg.name: pkg for pkg in PKGS}
+    for launch in SRC.rglob("*.launch.py"):
+        try:
+            tree = ast.parse(launch.read_text(encoding="utf-8"))
+        except SyntaxError as exc:
+            check(False, f"{launch.name} syntax error: {exc}")
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "Node"):
+                continue
+            values = {}
+            for kw in node.keywords:
+                if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                    values[kw.arg] = kw.value.value
+            package = values.get("package")
+            executable = values.get("executable")
+            if package is None:
+                continue
+            pkg = pkgs_by_name.get(package)
+            if pkg is None:  # external package (tf2_ros, ros_gz_*)
+                check(package in {"tf2_ros", "ros_gz_bridge", "ros_gz_sim",
+                                  "robot_state_publisher"},
+                      f"{launch.name}: unknown package {package}")
+                continue
+            if executable is None:
+                continue
+            scripts = _console_scripts(pkg)
+            check(executable in scripts,
+                  f"{launch.name}: {package}/{executable} is not a declared "
+                  f"console_script (has {sorted(scripts)})")
 
 
 def check_packages() -> None:
@@ -252,6 +316,7 @@ def main() -> int:
     check_packages()
     check_interfaces()
     check_entry_points()
+    check_launch_nodes()
     check_core_purity()
     check_assets()
     check_topics()

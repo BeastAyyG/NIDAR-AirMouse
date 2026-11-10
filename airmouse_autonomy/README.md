@@ -16,8 +16,8 @@ ROS-independent (numpy + stdlib) so they can be tested without ROS.
 
 **Verified offline on this machine (Windows, no ROS):**
 
-- 201 pytest tests across every algorithm core (`python -m pytest` at repo root).
-- `python airmouse_autonomy/tools/verify_workspace.py` → **122/122 static
+- 211 pytest tests across every algorithm core (`cd airmouse_autonomy && python -m pytest`).
+- `python airmouse_autonomy/tools/verify_workspace.py` → **142/142 static
   checks** (package metadata, entry points, core purity, 12 SDF worlds parse,
   RGB-D model, YAML configs, launch compile, topic coverage).
 - Offline mission replay (`airmouse_autonomy/reports/`): mission completes in
@@ -34,6 +34,10 @@ Harmonic / PX4 v1.17.0 target machine:**
 - VIO / RGB-D SLAM localization (Goal 4; truth baseline + evaluator shipped)
 
 Nothing above is claimed as tested. Run the Goal-0 checklist first.
+
+Post-landing hardening (PX4 offboard velocity bridge, camera TF, headless sim,
+launch/node verifier, one-command scripts) is documented in
+[docs/RUNTIME-HARDENING.md](docs/RUNTIME-HARDENING.md).
 
 ## Layout
 
@@ -91,6 +95,12 @@ ros2 launch airmouse_sim autonomy_bringup.launch.py
 
 # Individual scenario
 ros2 launch airmouse_sim sim_bringup.launch.py world:=narrow_passage.sdf
+
+# Headless (no display): server-only Gazebo, RGB-D camera still publishes
+ros2 launch airmouse_sim mission.launch.py world:=full_mission.sdf headless:=true
+
+# Without PX4 running, skip the offboard bridge
+ros2 launch airmouse_sim autonomy_bringup.launch.py start_offboard:=false
 ```
 
 Scenario worlds: straight corridor, L-corridor, T-junction, dead end, narrow
@@ -107,6 +117,7 @@ obstacles, noisy depth, loop closure, full mission (6 survivors + exit).
 | exploration_node | `/map`, `/survivors`, TF | `/goal`, `/mission_complete` |
 | navigation_node | `/map`, `/goal`, TF | `/path`, `/cmd_vel`, `/nav_status` |
 | mission_node | `/map`, `/survivors`, `/mission_complete`, TF | `/mission_status`, `/mission_state`, `/mission_command` |
+| offboard_bridge | `/cmd_vel`, `/odom`, `/mission_command`, `/fmu/out/vehicle_status` | `/fmu/in/offboard_control_mode`, `/fmu/in/trajectory_setpoint`, `/fmu/in/vehicle_command` |
 | localization_node | `/ground_truth/pose`, `/odom` | TF `map->base_link` (DEV baseline only) |
 
 Ground truth is used **only** by `localization_node` (development baseline) and
@@ -140,10 +151,14 @@ parameters.
 ## Validation
 
 ```bash
-# Offline replay + metrics + report (no ROS needed)
-python -m airmouse_validation.replay            # via PYTHONPATH or pytest
-python -m pytest airmouse_autonomy/src -q       # core suites
+# Offline replay + metrics + report (no ROS needed), one command
+python airmouse_autonomy/scripts/run_replay.py
+
+python -m pytest                                # core suites (cd airmouse_autonomy)
 python airmouse_autonomy/tools/verify_workspace.py
+
+# On the Ubuntu target: build + headless mission smoke test, one command
+bash airmouse_autonomy/scripts/smoke_mission.sh full_mission.sdf 40
 ```
 
 Sample output is committed in `airmouse_autonomy/reports/` (`report.md`,
