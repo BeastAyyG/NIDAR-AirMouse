@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>airmouse_validation</name>
+  <version>0.1.0</version>
+  <description>
+    Offline validation for the AirMouse autonomy workspace: deterministic replay
+    of the ROS-independent cores over a synthetic ground-truth world, metrics
+    against truth (map F1, occupancy precision/recall, collisions, survivor
+    matching) and a markdown + PNG + JSON report generator that marks
+    runtime-only acceptance items UNVERIFIED-OFFLINE.
+  </description>
+  <maintainer email="dev@local">airmouse</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>airmouse_mapping</exec_depend>
+  <exec_depend>airmouse_exploration</exec_depend>
+  <exec_depend>airmouse_navigation</exec_depend>
+  <exec_depend>airmouse_survivor</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

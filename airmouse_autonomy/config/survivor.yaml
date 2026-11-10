@@ -1,0 +1,11 @@
+# Survivor detection / tracking parameters.
+survivor:
+  detect_range_m: 5.0
+  base_confidence: 0.85
+  merge_radius_m: 1.2
+  confirm_confidence: 0.85
+  confirm_sightings: 3
+  decay_per_sec: 0.02
+  drop_confidence: 0.12
+  position_noise_m: 0.35
+  false_positive_rate: 0.03

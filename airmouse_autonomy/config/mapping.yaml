@@ -1,0 +1,16 @@
+# Occupancy mapping parameters.
+mapping:
+  cell_size_m: 0.10             # roadmap initial resolution
+  width_m: 15.0
+  height_m: 15.0
+  max_range_m: 6.0
+  clearance_m: 0.10             # drone disk radius for path smoothing
+  free_step: -1
+  free_floor: -4
+  hit_step: 2
+  hit_cap: 6
+  occupied_threshold: 1
+  min_frontier_cluster: 3
+  goal_search_radius: 3
+  flight_band_zmin_m: 0.3       # collision volume band (perception filters upstream)
+  flight_band_zmax_m: 2.0

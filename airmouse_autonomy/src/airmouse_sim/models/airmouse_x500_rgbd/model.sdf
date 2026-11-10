@@ -1,0 +1,346 @@
+<?xml version="1.0"?>
+<!--
+  AirMouse X500-class quadrotor with a true RGB-D payload.
+
+  This model closes the known survivor_cam gap: the old camera rig was RGB
+  only, so depth-based perception could never be exercised.  Here the
+  base_link carries an IMU and a camera_link carrying a Gazebo Harmonic
+  `rgbd_camera` sensor that publishes, under the single sensor topic
+  "camera" (gz topics):
+    /camera/image               (rgb)
+    /camera/depth_image         (depth, 32FC1)
+    /camera/camera_info         (rgb intrinsics)
+    /camera/depth_camera_info   (depth intrinsics)
+    /camera/points              (organized point cloud)
+  airmouse_sensors/config/gz_bridge.yaml maps those gz topics onto the
+  roadmap ROS topics (/camera/color/image_raw, /camera/depth/image_rect_raw,
+  /camera/color/camera_info, /camera/depth/camera_info,
+  /camera/depth/color/points).  The IMU sensor topic "imu" -> gz /imu is
+  bridged to /camera/imu.
+
+  Depth range 0.2 .. 8.0 m, RGB-D at 640x480 @ 20 Hz.  Gaussian sensor noise
+  (mean 0, stddev 0.007) is authored inside <camera>; Gazebo applies the
+  rgbd_camera noise model to both the colour and depth buffers.
+
+  The model is intentionally free of PX4 / ArduPilot plugins: PX4 SITL is
+  launched separately (see airmouse_sensors/README.md) and attaches to the
+  simulation through its own gz bridge.
+-->
+<sdf version="1.10">
+  <model name="airmouse_x500_rgbd">
+    <static>false</static>
+    <self_collide>false</self_collide>
+
+    <link name="base_link">
+      <inertial>
+        <mass>2.0</mass>
+        <inertia>
+          <ixx>0.012083</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.012083</iyy>
+          <iyz>0</iyz>
+          <izz>0.020833</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="body_visual">
+        <geometry>
+          <box>
+            <size>0.4 0.4 0.12</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.15 0.15 0.15 1</ambient>
+          <diffuse>0.20 0.20 0.20 1</diffuse>
+          <specular>0.10 0.10 0.10 1</specular>
+        </material>
+      </visual>
+
+      <collision name="body_collision">
+        <geometry>
+          <box>
+            <size>0.4 0.4 0.12</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- IMU on the body centre; gaussian noise on both rate and accel. -->
+      <sensor name="imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <topic>imu</topic>
+        <gz_frame_id>base_link</gz_frame_id>
+        <imu>
+          <angular_velocity>
+            <x>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.002</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.002</stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.002</stddev>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.02</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.02</stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0</mean>
+                <stddev>0.02</stddev>
+              </noise>
+            </z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </link>
+
+    <!-- Four rotor arms; visuals only (fixed joints keep them attached). -->
+    <link name="rotor_0">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.000225</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000225</iyy>
+          <iyz>0</iyz>
+          <izz>0.00045</izz>
+        </inertia>
+      </inertial>
+      <pose>0.22 0.22 0.02 0 0 0</pose>
+      <visual name="rotor_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.55 0.10 1</diffuse>
+        </material>
+      </visual>
+      <collision name="rotor_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="rotor_1">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.000225</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000225</iyy>
+          <iyz>0</iyz>
+          <izz>0.00045</izz>
+        </inertia>
+      </inertial>
+      <pose>-0.22 0.22 0.02 0 0 0</pose>
+      <visual name="rotor_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.55 0.10 1</diffuse>
+        </material>
+      </visual>
+      <collision name="rotor_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="rotor_2">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.000225</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000225</iyy>
+          <iyz>0</iyz>
+          <izz>0.00045</izz>
+        </inertia>
+      </inertial>
+      <pose>-0.22 -0.22 0.02 0 0 0</pose>
+      <visual name="rotor_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.55 0.10 1</diffuse>
+        </material>
+      </visual>
+      <collision name="rotor_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="rotor_3">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.000225</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000225</iyy>
+          <iyz>0</iyz>
+          <izz>0.00045</izz>
+        </inertia>
+      </inertial>
+      <pose>0.22 -0.22 0.02 0 0 0</pose>
+      <visual name="rotor_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.45 0.05 1</ambient>
+          <diffuse>0.95 0.55 0.10 1</diffuse>
+        </material>
+      </visual>
+      <collision name="rotor_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.12</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="camera_link">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00002</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00003</iyy>
+          <iyz>0</iyz>
+          <izz>0.00003</izz>
+        </inertia>
+      </inertial>
+      <pose>0.16 0 0.02 0 0 0</pose>
+      <visual name="camera_body_visual">
+        <geometry>
+          <box>
+            <size>0.06 0.09 0.05</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.25 1</ambient>
+          <diffuse>0.10 0.10 0.40 1</diffuse>
+        </material>
+      </visual>
+      <collision name="camera_body_collision">
+        <geometry>
+          <box>
+            <size>0.06 0.09 0.05</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- RGB-D: colour + depth + camera_info + points in one sensor. -->
+      <sensor name="camera" type="rgbd_camera">
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <update_rate>20</update_rate>
+        <topic>camera</topic>
+        <gz_frame_id>camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.2</near>
+            <far>8.0</far>
+          </clip>
+          <depth_camera>
+            <clip>
+              <near>0.2</near>
+              <far>8.0</far>
+            </clip>
+          </depth_camera>
+          <noise>
+            <type>gaussian</type>
+            <mean>0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </link>
+
+    <joint name="rotor_0_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_0</child>
+    </joint>
+    <joint name="rotor_1_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_1</child>
+    </joint>
+    <joint name="rotor_2_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_2</child>
+    </joint>
+    <joint name="rotor_3_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_3</child>
+    </joint>
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+  </model>
+</sdf>

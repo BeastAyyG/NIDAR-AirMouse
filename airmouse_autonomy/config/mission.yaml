@@ -1,0 +1,21 @@
+# AirMouse mission-level parameters (ROS-independent defaults).
+mission:
+  maze_width_m: 15.0
+  maze_height_m: 15.0
+  max_survivors: 6
+  time_limit_sim_s: 1800.0      # < 30 simulated minutes
+  replan_interval_s: 2.0
+  goal_reach_radius_m: 0.4
+  investigate_after_s: 4.0
+  max_investigate_attempts: 2
+  return_on_no_frontiers: true
+fsm:
+  sensor_loss_timeout_s: 2.0
+  loc_loss_timeout_s: 2.0
+  comms_loss_timeout_s: 1.0
+  hold_timeout_s: 10.0
+drone:
+  speed_mps: 2.0
+  footprint_radius_m: 0.10      # must fit narrowest passage (1-cell @0.10 = tight)
+  waypoint_pop_tolerance_m: 0.15
+  stuck_watchdog_s: 3.0

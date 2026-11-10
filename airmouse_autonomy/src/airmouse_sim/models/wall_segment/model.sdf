@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  Reusable 2.0 m wall segment: 2.0 (x) by 0.2 (y) by 2.0 (z) metres.
+
+  Worlds may include it (optionally with <scale> to stretch along x) or use
+  inline static boxes; both are valid SDF 1.10.  Keep the thickness at 0.2 m
+  and the height at 2.0 m to match the scenario contract.
+-->
+<sdf version="1.10">
+  <model name="wall_segment">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>2.0 0.2 2.0</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>2.0 0.2 2.0</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.55 0.55 0.55 1</ambient>
+          <diffuse>0.65 0.65 0.65 1</diffuse>
+          <specular>0.05 0.05 0.05 1</specular>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

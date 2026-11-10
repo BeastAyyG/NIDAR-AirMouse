@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>airmouse_mapping</name>
+  <version>0.1.0</version>
+  <description>
+    Occupancy mapping cores for the AirMouse autonomy workspace: hit/miss
+    counting occupancy grid, supercover ray integration, frontier clustering,
+    A* planning with drone-disk clearance smoothing, and nav2 map export.
+  </description>
+  <maintainer email="dev@local">airmouse</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>airmouse_perception</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
