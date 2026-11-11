@@ -175,6 +175,29 @@ rsync -av --exclude build --exclude install --exclude log \
 ssh airmouse-jetson.local 'cd ~/airmouse_autonomy && colcon build --symlink-install'
 ```
 
+### Over Tailscale — control from any network (optional)
+
+LAN/Ethernet is still the best link when you are next to the drone. Tailscale
+adds a private WireGuard mesh so SSH / VS Code / RViz work from anywhere
+(different Wi-Fi, LTE tether) with no port forwarding and no exposed SSH.
+
+1. **Jetson:** `curl -fsSL https://tailscale.com/install.sh | sh` then
+   `sudo tailscale up --hostname=airmouse-jetson` — open the printed URL and
+   sign in. arm64 / Ubuntu 22.04 is officially supported.
+2. **Windows desktop:** install the Tailscale client
+   (`winget install tailscale.tailscale`) and sign in to the **same
+   account/tailnet**.
+3. In the admin console (login.tailscale.com/admin/machines): enable
+   **MagicDNS**, and **Disable key expiry** for the Jetson node — otherwise
+   the drone drops off the tailnet every ~180 days, mid-project.
+4. Use it: `ssh user@airmouse-jetson` (MagicDNS name) or its `100.x.y.z`
+   address; the VS Code Remote-SSH host entry works unchanged from any
+   network. If `ufw` is active: `sudo ufw allow in on tailscale0`.
+5. Check the path: `tailscale status` / `tailscale ping airmouse-jetson` —
+   "direct" is fast, "relay (DERP)" adds latency. Both ends need internet;
+   in the field, tether the Jetson to a phone/LTE router or fall back to the
+   direct cable (§1.2).
+
 **Safety:** the companion link must never be the only control path. The RC
 transmitter and flight-controller failsafes (RC loss, battery, geofence)
 stay independent of SSH/ROS. Never stream raw `PointCloud2` over Wi-Fi
@@ -216,6 +239,30 @@ fastdds discovery -i 0 -l 0.0.0.0 -p 11811
 # Desktop
 export ROS_DISCOVERY_SERVER=<jetson-ip>:11811
 ```
+
+### ROS 2 over Tailscale
+
+Tailscale does not carry multicast, so default DDS discovery **will not
+work** across it — discovery must be unicast. Simplest is the same Fast DDS
+discovery server, pointed at the Jetson's tailnet address:
+
+```bash
+# Jetson: run the server (binds all interfaces, incl. tailscale0)
+fastdds discovery -i 0 -l 0.0.0.0 -p 11811
+
+# BOTH machines (PowerShell on Windows: $env:NAME="value")
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export ROS_DISCOVERY_SERVER=<jetson-tailnet-ip>:11811
+```
+
+CycloneDDS also works with an XML config (`<AllowMulticast>false</...>` plus
+a `<Peers>` list of tailnet IPs), but the discovery server avoids per-OS
+interface names. Two Tailscale-specific limits: the tunnel MTU is 1280, so
+large UDP datagrams fragment — keep the decimation rule (§6, rule 5) and
+never stream raw clouds; and latency varies with the path (direct vs DERP
+relay). The mission and control loops stay **on the Jetson** regardless —
+Tailscale is for editing, monitoring and recording, never a flight-critical
+link.
 
 Record bags **on the desktop** so the Jetson's disk and CPU stay free (this is
 also what feeds the video pipeline, see `docs/VIDEO-PIPELINE.md`):
@@ -426,5 +473,5 @@ Still open — only the user/hardware can answer:
 - 2D maps on a flying vehicle are an approximation: height slab + tilt
   compensation + altitude tracking are mandatory, or obstacles at other
   altitudes are invisible or falsely inflated.
-- Do not expose SSH to the internet; use keys, a firewall, and a VPN such as
-  Tailscale if you need remote access.
+- Do not expose SSH to the internet; use keys and a firewall, or Tailscale
+  (§3) for remote access.
