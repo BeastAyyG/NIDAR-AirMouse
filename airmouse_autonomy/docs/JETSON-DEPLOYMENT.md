@@ -4,11 +4,11 @@ How to run this stack on a **Jetson Orin Nano** while developing from a laptop
 or desktop, and how the 3D sensing becomes the 2D occupancy map the autonomy
 uses.
 
-Applies to: Orin Nano dev kit (4 GB or 8 GB), JetPack 6.2.x (Ubuntu 22.04),
-ROS 2 Humble. Sensor set assumed: **four LiDARs** (2D `sensor_msgs/LaserScan`
-expected) and **one front Intel RealSense depth camera** (user-confirmed;
-exact model comes from the bench script below). §9 lists what is already
-answered by this repo and what only the hardware can answer.
+Applies to the **verified rig** (2026-11-12): Jetson Orin Nano 8 GB "Super"
+dev kit, L4T R36.4.7 (JetPack 6.2.x), Ubuntu 22.04.5, ROS 2 Humble installed,
+front **Intel RealSense D435i** (fw 5.17.3.10, USB 3.2). Four LiDARs (2D
+`sensor_msgs/LaserScan` expected) are still to be confirmed — §9 lists what
+is answered and what only the hardware can answer.
 
 The same split we already use for the mission film applies: the Jetson flies
 and maps; the desktop displays, records and reviews.
@@ -297,8 +297,9 @@ python airmouse_autonomy/scripts/realsense_bench.py --seconds 5 --out realsense_
 It prints the exact model / serial / firmware / USB mode, streams
 depth+color, and writes previews plus `summary.json` (PASS = frames
 arriving, >5% valid depth, >5 fps). A RealSense on USB2 falls back to
-limited modes — use a USB3 port. On the Jetson, install the ROS driver
-after the bench passes:
+limited modes — use a USB3 port. **Verified on the rig 2026-11-12: D435i,
+24.8 fps depth+color, PASS** (`reports/realsense_bench/summary.json`).
+On the Jetson, install the ROS driver after the bench passes:
 
 ```bash
 # librealsense with the RSUSB backend — no kernel patching on JetPack
@@ -313,13 +314,24 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 # ROS 2 driver: apt if available for arm64 [verify], else build the
 # realsense-ros humble branch from source against the librealsense above
 sudo apt install -y ros-humble-realsense2-camera
-ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true
+ros2 launch realsense2_camera rs_launch.py camera_namespace:=/ pointcloud.enable:=true
 ```
 
-realsense-ros then publishes `/camera/color/image_raw`,
-`/camera/depth/image_rect_raw` and (with pointcloud enabled)
-`/camera/depth/color/points` — the same topic names the sim bridge uses, so
-the autonomy stack needs no remapping.
+**Verified on the rig (2026-11-12, realsense-ros 4.58.4):** two quirks —
+`camera_namespace:=/` is required or topics land under `/camera/camera/...`;
+and the `pointcloud.enable` launch arg does not reach the node, so enable
+the cloud at runtime:
+
+```bash
+ros2 param set /camera pointcloud__neon_.enable true
+```
+
+Result: `/camera/color/image_raw`, `/camera/depth/image_rect_raw` and
+`/camera/depth/color/points` at ~28 Hz — the same topic names the sim bridge
+uses, so the autonomy stack needs no remapping. Known limit: the D435i IMU
+fails with the apt librealsense on Jetson ("HID Motion Sensor Failure");
+depth/color are unaffected. The RSUSB source build above is the fix when
+the IMU is needed (e.g. for the gravity-aligned frame, §6 rule 2).
 
 **Confirm the LiDAR class before buying drivers:** 1D rangefinders
 (TFmini/VL53L, single ray), 2D spinning LiDARs (RPLidar, `LaserScan`) and 3D
@@ -487,15 +499,14 @@ again):
 | Existing code to convert | This repo — occupancy/perception/exploration/mission cores are ported and tested offline; no legacy 3D codebase to migrate |
 | Map purpose | Path planning + visualization for indoor SAR, flight band 0.30–2.00 m; reactive avoidance is optional later (§7) |
 | Front 3D sensor in sim | Gazebo RGB-D → `/camera/depth/color/points` (`PointCloud2`) |
-| Front 3D sensor on the rig | Intel RealSense depth camera (user-confirmed); exact model/serial from `scripts/realsense_bench.py` |
+| Front 3D sensor on the rig | Intel RealSense **D435i** (serial 261222075406, fw 5.17.3.10, USB 3.2) — bench PASS 2026-11-12, 24.8 fps depth+color; ROS topics verified live (`/camera/depth/color/points` ~28 Hz); IMU needs the RSUSB build (HID failure with apt librealsense) |
+| Board / software | Orin Nano **8 GB Super** dev kit, L4T **R36.4.7** (JetPack 6.2.x), Ubuntu 22.04.5, SD boot (233 GB), ROS 2 Humble + pyrealsense2 2.58.4 already installed; GUI + Firefox running (~2.2 GB RAM — go headless for flight, §1.4) |
 
 Still open — only the user/hardware can answer:
 
-1. Orin Nano **4 GB or 8 GB**? Dev kit or third-party carrier? Current
-   JetPack/L4T version, SD or NVMe boot? (§0 commands answer this in 1 min)
-2. Exact models + interfaces of the four LiDARs, and whether they are 1D,
+1. Exact models + interfaces of the four LiDARs, and whether they are 1D,
    2D or 3D (§5) — this decides the driver and fusion front-end.
-3. Power/weight budget and required obstacle-update rate for the airframe.
+2. Power/weight budget and required obstacle-update rate for the airframe.
 
 ## 10. Honest limits
 
