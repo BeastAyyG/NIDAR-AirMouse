@@ -399,9 +399,12 @@ Rules that make this work:
    carved. Reuse the mapper's counting occupancy — it is what stops noisy
    endpoints from sealing doorways.
 5. **Resolution and decimation.** 0.10 m cells on the Orin Nano. Decimate each
-   LiDAR scan to ~120–180 rays and update at 5–10 Hz. Budget: stay under
-   ~8k rays/second total; the mapper's Python ray loop is the limiter, not the
-   sensors. Voxel-downsample clouds (0.05 m leaf) and cap range (~20 m).
+   LiDAR scan to ~120–180 rays and update at 5–10 Hz. Measured on this rig
+   (§6.1): with a 6 m cap at ~14k rays/s the mapper is **not** the limiter —
+   receiving and deserialising an 848×480 cloud at 30 Hz is. Halving the
+   mapper rate changed CPU by 2 points; switching the driver to 480×270
+   dropped it from 57.5 % to 39.9 % of one core. Shrink the cloud profile
+   before you slow the mapper, and cap range to what the room needs.
 6. **Coverage gaps.** Four narrow-FoV LiDARs at 90° spacing leave blind
    sectors. Either overlap the FoVs, add a 360° unit, or accept that the
    planner must not route into unobserved directions (our frontier explorer
@@ -437,11 +440,85 @@ pointcloud_to_laserscan_node:
 Our mapper consumes rays directly, so this node is a convenience, not a
 requirement.
 
-**One integration piece not implemented yet:** the current
-`mapping_node` subscribes to a single point cloud. With four `LaserScan`
-inputs we need a small `scan_fusion` front-end (four subscriptions → one ray
-list → `mapper.update`). The design is exactly rule 4; it is the first work
-item for the hardware bring-up, tracked in the repo.
+### 6.1 `scan_fusion_node` — implemented and live-verified (2026-11-12)
+
+Rule 4 is now code: `airmouse_mapping/scan_fusion_node` plus the ROS-free
+`scan_fusion_core`. It subscribes the four `LaserScan` topics and the front
+cloud, converts every sweep into absolute map-frame rays and integrates them
+into one `OccupancyMapper`:
+
+```
+4 × /scan_{front,left,rear,right} ─▶ scan_to_rays(angles, ranges, pose_yaw, mount_yaw)
+                                     │  sector-binned, nearest return per sector,
+                                     │  empty sector ⇒ miss ray at max_range
+/front cloud ─▶ pointcloud_to_xyz ─▶ optical_to_body ─▶ filter_band ─▶ cloud_to_rays(fov)
+                                     └─▶ OccupancyMapper.update(pose, rays)
+                                          └─▶ /map @ 2 Hz + PGM/YAML on shutdown
+```
+
+Bench run on the Jetson (camera only, before the LiDARs exist):
+
+```bash
+# sources alone are enough for these pure-Python packages
+export PYTHONPATH=~/airmouse_autonomy/src/airmouse_mapping:\
+~/airmouse_autonomy/src/airmouse_perception:$PYTHONPATH
+
+# 1) sensor driver (see the §5 realsense-ros quirks)
+ros2 launch realsense2_camera rs_launch.py camera_namespace:=/ pointcloud.enable:=true &
+ros2 param set /camera pointcloud__neon_.enable true
+
+# 2) bench pose: drone 1 m above the floor, centred in the 15 × 15 m map
+ros2 run tf2_ros static_transform_publisher 7.5 7.5 1.0 0 0 0 1 map base_link &
+ros2 run tf2_ros static_transform_publisher 0.1 0 0.05 0 0 0 1 base_link camera_link &
+
+# 3) fuse
+python3 -m airmouse_mapping.scan_fusion_node --ros-args -p use_scans:=false
+
+# 4) prove it (PASS = repeated /map, FREE carved, OCCUPIED hit, >2 % explored)
+python3 scripts/verify_scan_fusion.py --seconds 15 --pgm /tmp/fusion_map.pgm
+```
+
+Measured on this rig (D435i + Orin Nano, 2026-11-12):
+
+| Config | Result |
+|---|---|
+| cloud only, 480×270 @ 28 Hz | `/map` 2.0 Hz, 5214 FREE + 287 OCCUPIED cells, 24 % explored, **PASS** |
+| cloud + 4 synthetic 90° scans (10 Hz, wall at 3.0 m) | ring at 3.08 m median; **206 of 292** occupied cells outside the camera's ±43° FoV ⇒ the LiDAR mount yaws really fuse |
+| `update_rate_hz` 5.0 → 2.5 per source | node CPU 57.5 % → 55.3 % of one core |
+| driver profile 848×480 → 480×270 | node CPU → **39.9 %** of one core |
+
+Two findings only a live rig produces:
+
+- **RGB-D clouds are optical, not body.** The D435i publishes
+  `camera_depth_optical_frame` (x right, y down, **z forward**). Fed straight
+  into a height band + 2D projection, forward depth was mistaken for
+  altitude and the map collapsed to a single occupied cell at the drone.
+  `optical_to_body()` now permutes the axes (x=depth, y=−x_opt, z=−y_opt)
+  before filtering; `cloud_frame:=optical` (default) or `body_z_up`.
+- **The cloud transport, not the mapper, is the limiter.** Rule 5's budget
+  assumption was wrong for this sensor: halving the fusion rate barely moved
+  CPU, while dropping the depth resolution cut it by ~30 %. Tune the driver
+  profile first.
+
+Parameters worth knowing:
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `scan_{front,left,rear,right}_topic` | `/scan_*` | remap to the driver's names |
+| `scan_*_mount_yaw_deg` | 0 / 90 / 180 / −90 | **measure on the rig** (map is x-right/y-down) |
+| `scan_rays` / `cloud_rays` | 120 / 90 | sector counts per sweep |
+| `cloud_fov_deg` | 86 | D435i depth HFOV ≈ 87° |
+| `cloud_frame` | `optical` | `body_z_up` for an already-forward cloud |
+| `use_scans` / `use_cloud` | true | `use_scans:=false` until the LiDARs are wired |
+| `update_rate_hz` | 5.0 | per source; 5 sources ⇒ 25 sweeps/s |
+| `flight_band_zmin_m` / `zmax_m` | 0.3 / 2.0 | world heights — rule 2 still applies in flight |
+| `save_dir` | `maps` | `airmouse_fusion_map_<stamp>.pgm/.yaml` on exit |
+
+The offline suite (`src/airmouse_mapping/test/test_scan_fusion_core.py`,
+22 tests) covers sector binning, pose + mount yaw composition, invalid and
+over-range samples, FOV clipping, miss-ray filling, rate gating and the
+optical-frame regression above. `mapping_node` (single cloud, simulation)
+is unchanged; the two share `ros_convert` and `occupancy_core`.
 
 ## 7. Optional later: reactive collision avoidance (PX4 CP)
 
@@ -474,12 +551,14 @@ coding. Target ≥10 Hz obstacle updates.
 4. [ ] `chrony` synchronized on both machines
 5. [ ] One LiDAR publishes `/scan_*` at the expected rate and FOV
 6. [ ] All four LiDARs publish, TF mounts match the physical rig
-7. [ ] Front RealSense passes `scripts/realsense_bench.py`, then publishes
-       points; gravity-aligned height band removes floor/ceiling
-8. [ ] Bench test (props off): move a box in front of each sensor, watch
-       `/map` update; no blind sectors at the bench
-9. [ ] Mapping resolution/decimation tuned to keep CPU under ~50% one core
-       (`jtop`)
+7. [x] Front RealSense passes `scripts/realsense_bench.py`, then publishes
+       points (verified 2026-11-12: 24.8 fps depth, `/camera/depth/color/points`
+       @ 28–30 Hz). Still to verify in flight: gravity-aligned height band
+8. [x] `scan_fusion_node` builds a map on the bench (§6.1 verified: 24 % of a
+       15 × 15 m grid explored, obstacle hits at the true range). Re-run with
+       a box moved in front of each sensor once the four LiDARs are mounted
+9. [x] Fusion CPU measured: 39.9 % of one core with the 480×270 cloud profile
+       (57.5 % at 848×480) — keep the cloud small, then tune rates
 10. [ ] Autonomy nodes run from the Jetson; RViz2 + recording on the desktop
 11. [ ] One recorded bag → clip → film (`docs/VIDEO-PIPELINE.md`)
 12. [ ] Flight progression: bench → tethered → low hover. Never test a first
@@ -513,8 +592,10 @@ Still open — only the user/hardware can answer:
 - CPU budget numbers above are estimates for an 8 GB Orin Nano; the 4 GB
   variant is tighter — measure with `jtop`/`tegrastats` on the real rig
   before trusting them. Keep one mapping node only; consider zram.
-- The scan-fusion node is not written yet; the mapper, footprint planning,
-  frontier exploration and mission logic it feeds are already tested offline.
+- The scan-fusion node exists and is live-verified against the RealSense plus
+  four synthetic `LaserScan` inputs (§6.1); it has NOT been flown, and never
+  been fed real LiDARs. The mapper, footprint planning, frontier exploration
+  and mission logic it feeds are tested offline.
 - GPU acceleration is available on the Orin but unused; the stack is numpy/CPU.
 - 2D maps on a flying vehicle are an approximation: height slab + tilt
   compensation + altitude tracking are mandatory, or obstacles at other

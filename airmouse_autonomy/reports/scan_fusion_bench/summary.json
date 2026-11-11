@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-12",
+  "subject": "scan_fusion_node live verification (4 LiDAR + front RGB-D -> 2D occupancy map)",
+  "rig": {
+    "board": "Jetson Orin Nano 8 GB Super",
+    "os": "Ubuntu 22.04.5 (L4T R36.4.7)",
+    "ros": "ROS 2 Humble",
+    "front_3d": "Intel RealSense D435i (fw 5.17.3.10, USB 3.2)",
+    "lidars": "none mounted yet - four synthetic LaserScan publishers used instead",
+    "pose_source": "static TF map->base_link (bench, props off)"
+  },
+  "offline_suite": {
+    "file": "src/airmouse_mapping/test/test_scan_fusion_core.py",
+    "tests": 22,
+    "workspace_total_passed": 240
+  },
+  "live_runs": [
+    {
+      "case": "cloud_only_before_optical_fix",
+      "driver_profile": "848x480x30",
+      "map_topic_hz": 2.0,
+      "free_cells": 1379,
+      "occupied_cells": 1,
+      "explored_fraction": 0.0613,
+      "verdict": "FAIL",
+      "cause": "camera_depth_optical_frame carries forward distance in z; the height band mistook depth for altitude"
+    },
+    {
+      "case": "cloud_only_after_optical_fix",
+      "driver_profile": "848x480x30",
+      "pose": "map->base_link at (7.5, 7.5, 1.0)",
+      "map_topic_hz": 2.0,
+      "free_cells": 1838,
+      "occupied_cells": 44,
+      "explored_fraction": 0.0836,
+      "occupied_radius_median_m": 3.59,
+      "occupied_angle_span_deg": [-30.1, 40.1],
+      "depth_median_m": 3.47,
+      "verdict": "PASS"
+    },
+    {
+      "case": "cloud_plus_four_synthetic_lidars",
+      "driver_profile": "848x480x30",
+      "scans": "4 x 181-sample LaserScan, 10 Hz, wall at 3.0-3.1 m, 15-sample inf gap",
+      "free_cells": 4654,
+      "occupied_cells": 292,
+      "explored_fraction": 0.2198,
+      "occupied_radius_median_m": 3.08,
+      "occupied_cells_beyond_camera_fov": 206,
+      "verdict": "PASS",
+      "note": "206 of 292 occupied cells lie outside the camera's +/-43 deg FoV, so the four mount yaws are contributing"
+    },
+    {
+      "case": "tuned_cloud_profile",
+      "driver_profile": "480x270x30",
+      "points_topic_hz": 28.0,
+      "free_cells": 5214,
+      "occupied_cells": 287,
+      "explored_fraction": 0.2445,
+      "map_export_on_shutdown": "airmouse_fusion_map_<stamp>.pgm + .yaml (nav2 map_server format)",
+      "verdict": "PASS"
+    }
+  ],
+  "cpu_of_one_core": {
+    "fusion_node_848x480_cloud_update_rate_5hz": 57.5,
+    "fusion_node_848x480_cloud_update_rate_2_5hz": 55.3,
+    "fusion_node_480x270_cloud": 39.9,
+    "realsense_driver_node": 35.3
+  },
+  "conclusions": [
+    "Mapper ray integration is not the Orin Nano bottleneck; RGB-D cloud transport is (halving the mapper rate changed CPU by ~2 points, quartering the cloud cut it by ~18).",
+    "RGB-D clouds must be converted from optical axes (x right, y down, z forward) to body axes before any height-band filter; covered by an offline regression test.",
+    "Bench pose must sit inside the map extent (a corner pose clipped half the sensor FoV outside the grid)."
+  ]
+}
