@@ -119,6 +119,7 @@ obstacles, noisy depth, loop closure, full mission (6 survivors + exit).
 | Node | Subscribes | Publishes |
 |---|---|---|
 | mapping_node | `/camera/depth/color/points`, TF | `/map` (OccupancyGrid, 2 Hz) |
+| scan_fusion_node | 4 × `/scan_{front,left,rear,right}` (LaserScan) + `/camera/depth/color/points`, TF | `/map` (OccupancyGrid, 2 Hz) — hardware counterpart of mapping_node, verified on the Jetson (docs/JETSON-DEPLOYMENT.md §6.1) |
 | perception_node | `/camera/depth/image_rect_raw`, `/camera/color/camera_info`, TF | `/obstacles` |
 | survivor_node | `/camera/color/image_raw`, depth, camera_info, TF | `/survivors` |
 | exploration_node | `/map`, `/survivors`, TF | `/goal`, `/mission_complete` |

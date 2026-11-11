@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'mapping_node = airmouse_mapping.mapping_node:main',
+            'scan_fusion_node = airmouse_mapping.scan_fusion_node:main',
         ],
     },
 )
