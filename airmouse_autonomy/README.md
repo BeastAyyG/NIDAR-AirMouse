@@ -84,6 +84,10 @@ Validate the environment before anything else:
 bash scripts/check_env.sh
 ```
 
+Running on a Jetson Orin Nano (desktop control over SSH/VS Code/ROS 2, four
+LiDARs + one front 3D sensor → 2D map, performance limits): see
+[docs/JETSON-DEPLOYMENT.md](docs/JETSON-DEPLOYMENT.md).
+
 ## Run
 
 ```bash
