@@ -6,9 +6,9 @@ uses.
 
 Applies to: Orin Nano dev kit (4 GB or 8 GB), JetPack 6.2.x (Ubuntu 22.04),
 ROS 2 Humble. Sensor set assumed: **four LiDARs** (2D `sensor_msgs/LaserScan`
-expected) and **one front 3D sensor** (RGB-D or solid-state LiDAR producing a
-point cloud). Exact sensor models still need to be confirmed — §9 lists what
-is already answered by this repo and what only the hardware can answer.
+expected) and **one front Intel RealSense depth camera** (user-confirmed;
+exact model comes from the bench script below). §9 lists what is already
+answered by this repo and what only the hardware can answer.
 
 The same split we already use for the mission film applies: the Jetson flies
 and maps; the desktop displays, records and reviews.
@@ -286,6 +286,41 @@ defaults differ:
 | Front 3D | `/camera/depth/color/points` (or `/front/points`) | `sensor_msgs/PointCloud2` |
 | IMU (if present) | `/camera/imu` | `sensor_msgs/Imu` |
 
+**Front 3D = Intel RealSense (confirmed).** Bench-test it before anything
+else — on either machine, no ROS needed:
+
+```bash
+pip install pyrealsense2 numpy
+python airmouse_autonomy/scripts/realsense_bench.py --seconds 5 --out realsense_bench
+```
+
+It prints the exact model / serial / firmware / USB mode, streams
+depth+color, and writes previews plus `summary.json` (PASS = frames
+arriving, >5% valid depth, >5 fps). A RealSense on USB2 falls back to
+limited modes — use a USB3 port. On the Jetson, install the ROS driver
+after the bench passes:
+
+```bash
+# librealsense with the RSUSB backend — no kernel patching on JetPack
+sudo apt install -y cmake libusb-1.0-0-dev
+git clone https://github.com/IntelRealSense/librealsense && cd librealsense
+mkdir build && cd build
+cmake .. -DFORCE_RSUSB_BACKEND=ON -DBUILD_EXAMPLES=OFF -DBUILD_GRAPHICAL_EXAMPLES=OFF
+make -j$(nproc) && sudo make install
+sudo cp config/99-realsense-libusb.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# ROS 2 driver: apt if available for arm64 [verify], else build the
+# realsense-ros humble branch from source against the librealsense above
+sudo apt install -y ros-humble-realsense2-camera
+ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true
+```
+
+realsense-ros then publishes `/camera/color/image_raw`,
+`/camera/depth/image_rect_raw` and (with pointcloud enabled)
+`/camera/depth/color/points` — the same topic names the sim bridge uses, so
+the autonomy stack needs no remapping.
+
 **Confirm the LiDAR class before buying drivers:** 1D rangefinders
 (TFmini/VL53L, single ray), 2D spinning LiDARs (RPLidar, `LaserScan`) and 3D
 LiDARs (Livox Mid-360, `PointCloud2`) need completely different front-ends.
@@ -427,8 +462,8 @@ coding. Target ≥10 Hz obstacle updates.
 4. [ ] `chrony` synchronized on both machines
 5. [ ] One LiDAR publishes `/scan_*` at the expected rate and FOV
 6. [ ] All four LiDARs publish, TF mounts match the physical rig
-7. [ ] Front 3D publishes points; gravity-aligned height band removes
-       floor/ceiling
+7. [ ] Front RealSense passes `scripts/realsense_bench.py`, then publishes
+       points; gravity-aligned height band removes floor/ceiling
 8. [ ] Bench test (props off): move a box in front of each sensor, watch
        `/map` update; no blind sectors at the bench
 9. [ ] Mapping resolution/decimation tuned to keep CPU under ~50% one core
@@ -452,6 +487,7 @@ again):
 | Existing code to convert | This repo — occupancy/perception/exploration/mission cores are ported and tested offline; no legacy 3D codebase to migrate |
 | Map purpose | Path planning + visualization for indoor SAR, flight band 0.30–2.00 m; reactive avoidance is optional later (§7) |
 | Front 3D sensor in sim | Gazebo RGB-D → `/camera/depth/color/points` (`PointCloud2`) |
+| Front 3D sensor on the rig | Intel RealSense depth camera (user-confirmed); exact model/serial from `scripts/realsense_bench.py` |
 
 Still open — only the user/hardware can answer:
 
@@ -459,8 +495,7 @@ Still open — only the user/hardware can answer:
    JetPack/L4T version, SD or NVMe boot? (§0 commands answer this in 1 min)
 2. Exact models + interfaces of the four LiDARs, and whether they are 1D,
    2D or 3D (§5) — this decides the driver and fusion front-end.
-3. Exact front 3D sensor model (depth camera vs 3D LiDAR), FoV, range, rate.
-4. Power/weight budget and required obstacle-update rate for the airframe.
+3. Power/weight budget and required obstacle-update rate for the airframe.
 
 ## 10. Honest limits
 
