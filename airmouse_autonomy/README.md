@@ -87,6 +87,9 @@ bash scripts/check_env.sh
 Running on a Jetson Orin Nano (desktop control over SSH/VS Code/ROS 2, four
 LiDARs + one front 3D sensor → 2D map, performance limits): see
 [docs/JETSON-DEPLOYMENT.md](docs/JETSON-DEPLOYMENT.md).
+**Picking up the Jetson work cold? Start at
+[docs/JETSON-HANDOFF.md](docs/JETSON-HANDOFF.md)** — current state, exact
+commands, every known quirk, and remaining tasks with success criteria.
 
 ## Run
 
