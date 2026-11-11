@@ -478,6 +478,14 @@ python3 -m airmouse_mapping.scan_fusion_node --ros-args -p use_scans:=false
 python3 scripts/verify_scan_fusion.py --seconds 15 --pgm /tmp/fusion_map.pgm
 ```
 
+**Live browser view (no ROS on the laptop):** `scripts/run_live_demo.sh`
+starts all of the above plus `scripts/live_view.py`, which serves the colour
+video (crosshair + centre/nearest distance readout) next to the live fused
+2D map as MJPEG — open `http://airmouse-jetson:8080/` from any machine on
+the tailnet. `--stop` shuts the demo down; logs land in `~/airmouse_logs/`.
+The composition is ROS-free (`airmouse_validation/live_view.py`, 7 offline
+tests); the adapter only subscribes and serves JPEG.
+
 Measured on this rig (D435i + Orin Nano, 2026-11-12):
 
 | Config | Result |
